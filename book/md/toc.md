@@ -65,10 +65,10 @@
 
 ## Part VII: Model Architectures — The Fast* Classes
 
-30. [Chapter 30: FastLlamaModel — The Reference Implementation](chapter-30-fast-llama.md)
-31. [Chapter 31: Gemma, Gemma 2, and Gemma 3 Support](chapter-31-gemma-models.md)
-32. [Chapter 32: Qwen 2, Qwen 3, and Qwen 3 MoE](chapter-32-qwen-models.md)
-33. [Chapter 33: Mistral, Cohere, Granite, and Falcon H1](chapter-33-other-architectures.md)
+30. ✅ [Chapter 30: FastLlamaModel — The Reference Implementation](chapter-30-fast-llama.md)
+31. ✅ [Chapter 31: Gemma, Gemma 2, and Gemma 3 Support](chapter-31-gemma-models.md)
+32. ✅ [Chapter 32: Qwen 2, Qwen 3, and Qwen 3 MoE](chapter-32-qwen-models.md)
+33. ✅ [Chapter 33: Mistral, Cohere, Granite, and Falcon H1](chapter-33-other-architectures.md)
 
 ---
 
