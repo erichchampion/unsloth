@@ -139,7 +139,35 @@ Dequantization (inside the kernel):
   4. Result: float16 or float32 weight value
 ```
 
-The kernel also handles the double quantization variant (`bnb_4bit_use_double_quant=True`), where the block scale factors themselves are quantized to 8-bit.
+### The NF4 Quantization Table
+
+NF4 uses a fixed set of 16 values optimized for the normal distribution of neural network weights:
+
+```
+Index:  0       1       2       3       4       5       6       7
+Value: -1.000  -0.692  -0.523  -0.395  -0.286  -0.195  -0.113  -0.035
+
+Index:  8       9       10      11      12      13      14      15
+Value:  0.035   0.113   0.195   0.286   0.395   0.523   0.692   1.000
+```
+
+These 16 values are the quantiles of a standard normal distribution — spaced more densely near zero where most weights cluster. This is why NF4 outperforms uniform 4-bit quantization for neural network weights.
+
+### Block-wise Dequantization
+
+Weights are quantized in blocks of 64 values, each sharing a single FP16 scale factor:
+
+```python
+# Dequantization (simplified):
+block_size = 64
+for block_idx in range(num_blocks):
+    scale = scales[block_idx]                    # FP16 scale factor
+    for i in range(block_size):
+        nf4_index = packed_weights[block_idx, i]  # 4-bit index (0-15)
+        weight_fp16 = NF4_TABLE[nf4_index] * scale  # Dequantized value
+```
+
+The kernel also handles the double quantization variant (`bnb_4bit_use_double_quant=True`), where the block scale factors themselves are quantized to 8-bit, saving an additional ~0.4 bits per weight.
 
 ---
 

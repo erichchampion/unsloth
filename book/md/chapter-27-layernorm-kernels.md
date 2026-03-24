@@ -142,7 +142,70 @@ def rms_norm_kernel(x_ptr, weight_ptr, output_ptr, eps, d: tl.constexpr):
 | Global memory writes | 3d | d | 3× less |
 | Intermediate allocations | 2 tensors | 0 | 100% reduction |
 
-For a 32-layer model with 2 norms per layer, this adds up to 192 eliminated kernel launches and 128d eliminated memory transactions per forward pass.
+For a 32-layer model with 2 norms per layer, this adds up to 192 eliminated kernel launches. The savings are per-layer and apply to both `input_layernorm` and `post_attention_layernorm`, so the total is doubled.
+
+### Source Code Walkthrough: The Forward Kernel
+
+The actual Triton kernel from `rms_layernorm.py` — annotated:
+
+```python
+@triton.jit
+def _rms_layernorm_forward(
+    Y, Y_row_stride,     # Output tensor + stride
+    X, X_row_stride,     # Input tensor + stride
+    W, W_row_stride,     # Weight tensor + stride
+    r, r_row_stride,     # Inverse variance (saved for backward)
+    n_cols: tl.constexpr,
+    eps: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
+    """Each program instance processes one row (one token)."""
+    row_idx = tl.program_id(0)
+    col_offsets = tl.arange(0, BLOCK_SIZE)
+    mask = col_offsets < n_cols
+    
+    # Load entire row into registers (hidden_dim fits in one block)
+    X_row = tl.load(X + row_idx*X_row_stride + col_offsets,
+                    mask=mask, other=0).to(tl.float32)
+    W_row = tl.load(W + col_offsets, mask=mask, other=0)
+    
+    # Compute RMS: sqrt(mean(x²))
+    row_var = tl.sum(X_row * X_row, axis=0) / n_cols
+    inv_var = tl.math.rsqrt(row_var + eps)   # 1/sqrt(var + eps)
+    tl.store(r + row_idx, inv_var)            # Save for backward pass
+    
+    # Normalize and scale
+    normed = X_row * inv_var                  # x̂ = x / RMS(x)
+    normed = normed.to(W_row.dtype)           # Match weight dtype
+    output = normed * W_row                   # y = x̂ * γ
+    
+    tl.store(Y + row_idx*Y_row_stride + col_offsets, output, mask=mask)
+```
+
+### Gemma Variant: The +1 Offset
+
+Gemma's RMSNorm adds 1.0 to the weight, so initially-zero weights produce an identity transform:
+
+```python
+@triton.jit
+def _gemma_rms_layernorm_forward(...):
+    # Same as standard RMSNorm, except the final line:
+    output = normed * (W_row + 1.0)    # Note: +1.0 !
+    # Standard:  output = normed * W_row
+    # Gemma:     output = normed * (W_row + 1.0)
+```
+
+This is handled via the `gemma` flag in `fast_rms_layernorm()`, which selects the correct kernel variant. The backward kernel similarly branches:
+
+```python
+# In backward:
+if GEMMA:
+    dY_W = dY_row * (W_row + 1.0)   # Chain rule through (W + 1)
+else:
+    dY_W = dY_row * W_row
+```
+
+For a 32-layer model this means 128 fewer kernel launches just for normalization.
 
 ---
 

@@ -87,6 +87,94 @@ log_sum_exp = running_max + log(running_sum)
 
 ---
 
+## 23.3 Source Code Walkthrough: The Forward Kernel
+
+The actual Triton kernel from `cross_entropy_loss.py` — annotated line by line:
+
+```python
+def _cross_entropy_forward(
+    logits_ptr, logits_row_stride,      # Pointer to logit matrix + stride
+    loss_ptr, logsumexp_ptr,            # Output pointers
+    labels_ptr,                         # Target token indices
+    VOCAB_SIZE: tl.constexpr,           # Vocabulary dimension
+    BLOCK_SIZE: tl.constexpr,           # Tile size (auto-tuned)
+    DO_SOFTCAPPING: tl.constexpr,       # Gemma 2 soft-capping flag
+    SOFTCAP: tl.constexpr,             # Soft-capping value (e.g., 30.0)
+    DO_LOGIT_SCALING: tl.constexpr,     # Cohere logit scaling flag
+    LOGIT_SCALE: tl.constexpr,         # Scale factor
+):
+    """
+    Each program instance processes one row (one token's logits).
+    
+    The math (from source comments):
+      CE_i = -y * log(P) = y * (logsumexp - x)
+      If y == 0: CE_i = 0     (padding/non-target)
+      If y == 1: CE_i = logsumexp - x   (target token)
+    """
+    row_idx = tl.program_id(0)                          # Which token
+    logits_ptr += row_idx * logits_row_stride           # Advance to this row
+    
+    col_offsets = tl.arange(0, BLOCK_SIZE)              # [0, 1, 2, ..., BLOCK_SIZE-1]
+    mask = col_offsets < VOCAB_SIZE                      # Handle vocab not divisible by block
+    
+    label_idx = tl.load(labels_ptr + row_idx).to(tl.int32)  # Target token
+    logits = tl.load(logits_ptr + col_offsets, mask=mask, other=-float("inf"))
+    logits = logits.to(tl.float32)                      # Always accumulate in FP32
+    
+    # Optional model-specific transforms:
+    if DO_LOGIT_SCALING:  logits = LOGIT_SCALE * logits          # Cohere
+    if DO_SOFTCAPPING:    logits = SOFTCAP * tanh(logits/SOFTCAP) # Gemma 2
+    
+    # Log-sum-exp with numerical stability:
+    c = tl.max(logits, 0)                               # c = max(logits)
+    logsumexp = c + tl.log(tl.sum(tl.exp(logits - c), 0))  # Stable LSE
+    
+    # Loss = logsumexp - x_target (or 0 for padding)
+    if label_idx != -100:                               # -100 = ignore index
+        x = tl.load(logits_ptr + label_idx).to(tl.float32)  # Target logit
+        loss = logsumexp - x
+    else:
+        loss = 0.0
+    
+    tl.store(logsumexp_ptr + row_idx, logsumexp)        # Save for backward
+    tl.store(loss_ptr + row_idx, loss)                  # Per-token loss
+```
+
+### The Chunked Variant
+
+For vocabularies larger than 65,536 (like Gemma's 256K), a second kernel processes vocabulary in chunks:
+
+```python
+# From _chunked_cross_entropy_forward:
+# Each chunk computes its own logsumexp independently.
+# Then a final reduction combines them:
+#   logsumexp(all) = logsumexp([lse_chunk1, lse_chunk2, ...])
+#
+# This works because:
+#   log[sum(exp(a)) + sum(exp(b))] = logsumexp([logsumexp(a), logsumexp(b)])
+
+logsumexp = torch.logsumexp(chunk_logsumexps, dim=1)  # Row-wise reduction
+losses += logsumexp                                    # Add logsumexp to stored -x
+losses.masked_fill_(labels == -100, 0)                 # Mask padding
+```
+
+### The Backward Kernel
+
+The backward pass computes gradients in-place, overwriting the logits tensor:
+
+```python
+# From _cross_entropy_backward:
+# dC/dx = softmax(x) for non-target positions
+# dC/dx = softmax(x) - 1 for the target position
+y = tl.exp(x - logsumexp)                   # softmax = exp(x) / sum(exp(x))
+y = tl.where(col_offsets == label_idx,
+             y - 1.0,                        # Target: softmax - 1
+             y)                              # Non-target: softmax
+tl.store(logits_ptr + col_offsets, dloss * y) # Write gradient in-place
+```
+
+---
+
 ## 23.3 Memory Savings
 
 | Model | Vocab | Standard Peak | Unsloth Peak | Reduction |

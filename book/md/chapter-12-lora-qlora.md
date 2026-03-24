@@ -42,6 +42,32 @@ For a typical attention layer with d=4096, k=4096, and r=16:
 
 The scaling factor α/r (called `lora_alpha / r`) controls how much the LoRA update influences the output.
 
+### Why Low-Rank Updates Work
+
+The key insight is that weight changes during fine-tuning tend to be **low-rank** — they occupy a small subspace of the full weight matrix. Research shows that the effective rank of weight updates during full fine-tuning is typically much lower than the matrix dimensions. LoRA exploits this by constraining the update to a rank-r subspace from the start.
+
+Consider the SVD (Singular Value Decomposition) of the weight change during full fine-tuning:
+
+```
+ΔW = UΣV^T
+
+Where:
+  U ∈ ℝ^(d×d)    — left singular vectors
+  Σ ∈ ℝ^(d×k)    — singular values (diagonal, sorted descending)
+  V ∈ ℝ^(k×k)    — right singular vectors
+
+In practice, most singular values are near zero:
+  Σ = diag(σ₁, σ₂, ..., σ_r, ≈0, ≈0, ..., ≈0)
+                    ↑ rank r    ↑ negligible
+```
+
+LoRA approximates this by learning `B ≈ U[:,:r] · Σ[:r,:r]` and `A ≈ V[:,:r]^T`, capturing the top-r singular directions. Rank 16 typically captures >95% of the fine-tuning signal.
+
+### Initialization
+
+- **A** is initialized with random Gaussian values (Kaiming uniform)
+- **B** is initialized to **zero** — so the LoRA output starts as zero, meaning the model begins training from its original behavior
+
 ---
 
 ## 12.2 QLoRA: 4-bit Quantized LoRA

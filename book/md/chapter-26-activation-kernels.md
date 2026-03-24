@@ -57,6 +57,65 @@ output = fast_swiglu_fg(gate_proj_weight, up_proj_weight, x)
 
 Memory saved: **86 MB per sample** (the two intermediate tensors are never materialized).
 
+### Source Code Walkthrough: The SwiGLU Forward Kernel
+
+The actual Triton kernel from `swiglu.py` — annotated:
+
+```python
+@triton.jit
+def _fg_kernel(e, g, h, n_elements,
+               BLOCK_SIZE: tl.constexpr, LONG_INDEXING: tl.constexpr):
+    """
+    e = gate_proj output,  g = up_proj output,  h = output buffer
+    Computes: h = SiLU(e) * g = (e * sigmoid(e)) * g
+    """
+    block_idx = tl.program_id(0)
+    offsets = block_idx * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+    mask = offsets < n_elements
+    
+    e_row = tl.load(e + offsets, mask=mask, other=0).to(tl.float32)  # FP32 accumulation
+    g_row = tl.load(g + offsets, mask=mask, other=0)
+    
+    f_row = e_row * tl.sigmoid(e_row)  # SiLU = x * σ(x) — computed in-register
+    f_row = f_row.to(g_row.dtype)      # Cast back to model dtype (bf16/fp16)
+    h_row = f_row * g_row              # Gate × Up — the GLU operation
+    
+    tl.store(h + offsets, h_row, mask=mask)  # Single write
+```
+
+### Source Code Walkthrough: The SwiGLU Backward Kernel
+
+The backward kernel is more complex — it computes three related values in a single pass and reuses buffers to avoid allocations:
+
+```python
+@triton.jit
+def _DWf_DW_dfg_kernel(DW, e, g, n_elements, ...):
+    """
+    Given upstream gradient DW, computes:
+      h  = SiLU(e) * g              (forward recomputation)
+      df = DW * SiLU(e)             (gradient for up_proj)
+      de = DW * g * σ(e) * (1 + e*(1-σ(e)))  (gradient for gate_proj)
+    
+    Critically: stores results IN THE INPUT BUFFERS to avoid allocations:
+      DW buffer ← h    (reused for forward output)
+      e  buffer ← df   (reused for gate gradient)
+      g  buffer ← de   (reused for up gradient)
+    """
+    se_row = tl.sigmoid(e_row)                           # σ(e)
+    f_row  = se_row * e_row                              # SiLU(e)
+    h_row  = f_row * g_row                               # SiLU(e) * g
+    df_row = DW_row * f_row                              # ∂L/∂up
+    dg_row = DW_row * g_row                              # intermediate
+    de_row = dg_row * se_row * (1.0 + e_row * (1.0 - se_row))  # ∂L/∂gate
+    
+    # Overwrite input buffers — zero allocations for gradients!
+    tl.store(DW + offsets, h_row,  mask=mask)  # DW ← h
+    tl.store(e  + offsets, df_row, mask=mask)  # e  ← df
+    tl.store(g  + offsets, de_row, mask=mask)  # g  ← de
+```
+
+The backward kernel's buffer reuse is a key optimization — it computes three outputs without allocating any new memory.
+
 ---
 
 ## 26.2 GeGLU — The GELU Variant

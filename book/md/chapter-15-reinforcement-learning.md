@@ -62,6 +62,63 @@ GRPO:
 3. **Compute group advantages** — normalize rewards within each prompt's group of completions
 4. **Update policy** — use the advantages to update the policy model via gradient descent
 
+### The GRPO Algorithm
+
+```
+Algorithm: Group Relative Policy Optimization
+
+Input: Policy π_θ, Reference policy π_ref, Prompt dataset D, 
+       Group size G, KL coefficient β
+
+For each training step:
+  1. Sample prompt p from D
+  2. Generate G completions: {o₁, o₂, ..., o_G} ~ π_θ(· | p)
+  3. Compute rewards: rᵢ = R(oᵢ, p) for each completion
+  
+  4. Compute group advantages (the "group relative" part):
+     mean_r = mean(r₁, r₂, ..., r_G)
+     std_r  = std(r₁, r₂, ..., r_G)
+     Aᵢ = (rᵢ - mean_r) / (std_r + ε)    ← normalize within group
+  
+  5. Compute policy gradient loss:
+     L = -Σᵢ Aᵢ · log π_θ(oᵢ|p)           ← REINFORCE with advantages
+       + β · KL(π_θ || π_ref)               ← KL penalty for stability
+
+  6. Update θ via gradient descent on L
+```
+
+The key insight is step 4: by normalizing rewards within each group, GRPO eliminates the need for an absolute value baseline (which PPO gets from its critic network). This is why GRPO doesn't need a value model — the group mean *is* the baseline.
+
+### Reward Functions
+
+Unsloth supports multiple types of reward functions in GRPO:
+
+```python
+# Rule-based reward (no model needed):
+def accuracy_reward(completions, prompt):
+    """Check if the answer is mathematically correct."""
+    scores = []
+    for completion in completions:
+        answer = extract_answer(completion)
+        scores.append(1.0 if answer == expected else 0.0)
+    return scores
+
+# Format reward (check output structure):
+def format_reward(completions, prompt):
+    """Reward proper XML/JSON formatting."""
+    scores = []
+    for completion in completions:
+        has_tags = "<answer>" in completion and "</answer>" in completion
+        scores.append(1.0 if has_tags else 0.0)
+    return scores
+
+# Usage: multiple rewards are combined
+trainer = GRPOTrainer(
+    reward_funcs=[accuracy_reward, format_reward],  # Both applied
+    ...
+)
+```
+
 ### Memory Optimization in Unsloth
 
 Unsloth's GRPO implementation achieves 80% less VRAM through:

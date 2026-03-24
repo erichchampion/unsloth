@@ -67,6 +67,61 @@ q_rot, k_rot = fast_rope_embedding(q, k, position, inv_freq)
 
 The fused kernel avoids materializing the cos/sin tensors (each of which is `[seq_len, dim/2]`), saving memory and eliminating three kernel launch overheads.
 
+### Source Code Walkthrough: The Rotation Kernel
+
+The actual Triton kernel from `rope_embedding.py` — annotated:
+
+```python
+def _rope_embedding(
+    Q, Q_row_stride,
+    cos, cos_row_stride,
+    sin, sin_row_stride,
+    seqlen, head_dim, n_heads,
+    BACKWARD_PASS: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
+    """
+    RoPE is Q * cos + rotate_half(Q) * sin
+    Each program processes one (row, head_group) pair.
+    """
+    ROPE_GROUP_SIZE = 4
+    row_position  = tl.program_id(0)   # Which (batch, seq) position
+    group_head    = tl.program_id(1)   # Which group of 4 heads
+    half_head_dim = head_dim // 2
+    
+    col_offsets = tl.arange(0, BLOCK_SIZE)
+    mask = col_offsets < half_head_dim
+    
+    # Load cos/sin for this position (position = row % seq_len)
+    sin1 = tl.load(sin + (row_position % seqlen) * sin_row_stride + col_offsets,
+                   mask=mask, other=0)
+    cos1 = tl.load(cos + (row_position % seqlen) * cos_row_stride + col_offsets,
+                   mask=mask, other=0)
+    
+    # For backward pass: negate sin (rotation in opposite direction)
+    if BACKWARD_PASS: sin1 = -sin1
+    
+    # Process 4 heads per thread block (10% speedup from PR #238)
+    head_start = group_head * ROPE_GROUP_SIZE
+    head_end   = min(head_start + ROPE_GROUP_SIZE, n_heads)
+    
+    for k in range(head_start, head_end):
+        # Load the two halves of this head's Q vector
+        Q1 = tl.load(Q + row_position * Q_row_stride + k * head_dim + col_offsets,
+                     mask=mask, other=0)
+        Q2 = tl.load(Q + row_position * Q_row_stride + k * head_dim + col_offsets
+                     + half_head_dim, mask=mask, other=0)
+        
+        # Apply rotation: [q0', q1'] = [q0*cos - q1*sin, q1*cos + q0*sin]
+        tl.store(Q + ... + col_offsets,                Q1*cos1 - Q2*sin1, mask=mask)
+        tl.store(Q + ... + col_offsets + half_head_dim, Q2*cos1 + Q1*sin1, mask=mask)
+```
+
+Key design decisions:
+- **Grouped heads** — processes 4 attention heads per program instance, amortizing the cos/sin load
+- **In-place** — modifies Q and K tensors directly, avoiding output allocation
+- **Shared backward** — same kernel with negated sin handles the backward pass
+
 ---
 
 ## 25.3 Scaling Methods
