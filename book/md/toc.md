@@ -14,9 +14,9 @@
 
 ## Part II: Installation and Setup
 
-4. [Chapter 4: Installing Unsloth — Studio, Core, and Docker](chapter-04-installation.md)
-5. [Chapter 5: The CLI Entry Point — Typer Commands and Configuration](chapter-05-cli-entry-point.md)
-6. [Chapter 6: Device Detection and GPU Setup](chapter-06-device-detection.md)
+4. ✅ [Chapter 4: Installing Unsloth — Studio, Core, and Docker](chapter-04-installation.md)
+5. ✅ [Chapter 5: The CLI Entry Point — Typer Commands and Configuration](chapter-05-cli-entry-point.md)
+6. ✅ [Chapter 6: Device Detection and GPU Setup](chapter-06-device-detection.md)
 
 ---
 
