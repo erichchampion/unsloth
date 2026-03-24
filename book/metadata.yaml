@@ -1,0 +1,52 @@
+# EPUB Metadata Configuration
+# Customize this file for your book's metadata
+
+# Book title (required)
+title: "Inside OpenCode"
+
+# Subtitle (optional)
+subtitle: "How an AI Coding Agent Works"
+
+# Author name(s) (required)
+# For multiple authors, use a list:
+# authors:
+#   - "First Author"
+#   - "Second Author"
+author: "Erich Champion"
+
+# Publisher (optional)
+publisher: "Erich Champion"
+
+# Publication date (optional, format: YYYY-MM-DD)
+date: "2025-03-22"
+
+# Book language (required, ISO 639-1 code)
+language: "en"
+
+# Book description/summary (optional)
+description: |
+  A comprehensive review of OpenCode, an open-source AI coding assistant.
+
+# Subject/category (optional)
+subjects:
+  - "Artificial Intelligence"
+  - "Software Development"
+  - "Programming"
+
+# ISBN (optional)
+isbn: "979-8-9937022-3-0"
+
+# Copyright/rights statement (optional)
+rights: "© 2026 Erich Champion. All rights reserved."
+
+# Series information (optional)
+# series: "AI Development Series"
+# series-number: "1"
+
+# Cover image (optional, path relative to this file)
+cover-image: "5x8.jpg"
+
+# Tags/keywords (optional)
+tags:
+  - "AI"
+  - "Coding Assistant"

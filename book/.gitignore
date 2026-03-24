@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Build output
+dita/
+*.epub
+*.pdf
+*.log
+
+# DITA-OT plugins (installed locally)
+pdf-theme/
+pdf-theme-syntax-highlight/
+pdf-theme-syntax-highlight.zip
