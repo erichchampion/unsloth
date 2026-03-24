@@ -74,10 +74,10 @@
 
 ## Part VIII: Unsloth Studio — The Web Interface
 
-34. [Chapter 34: Studio Architecture — Backend and Frontend](chapter-34-studio-architecture.md)
-35. [Chapter 35: Studio Chat — Inference, Tool Calling, and Code Execution](chapter-35-studio-chat.md)
-36. [Chapter 36: Studio Training — Configuration and Observability](chapter-36-studio-training.md)
-37. [Chapter 37: Data Recipes — Visual Dataset Creation](chapter-37-data-recipes.md)
+34. ✅ [Chapter 34: Studio Architecture — Backend and Frontend](chapter-34-studio-architecture.md)
+35. ✅ [Chapter 35: Studio Chat — Inference, Tool Calling, and Code Execution](chapter-35-studio-chat.md)
+36. ✅ [Chapter 36: Studio Training — Configuration and Observability](chapter-36-studio-training.md)
+37. ✅ [Chapter 37: Data Recipes — Visual Dataset Creation](chapter-37-data-recipes.md)
 
 ---
 
