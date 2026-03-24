@@ -22,11 +22,11 @@
 
 ## Part III: Running Models (Inference)
 
-7. [Chapter 7: Loading a Model — FastLanguageModel.from_pretrained](chapter-07-loading-a-model.md)
-8. [Chapter 8: The Model Registry — Mapping Names to Weights](chapter-08-model-registry.md)
-9. [Chapter 9: Model Dispatch — Architecture-Specific Fast Paths](chapter-09-model-dispatch.md)
-10. [Chapter 10: Inference with vLLM — fast_inference Mode](chapter-10-fast-inference.md)
-11. [Chapter 11: Chat Templates and Tokenizer Utilities](chapter-11-chat-templates.md)
+7. ✅ [Chapter 7: Loading a Model — FastLanguageModel.from_pretrained](chapter-07-loading-a-model.md)
+8. ✅ [Chapter 8: The Model Registry — Mapping Names to Weights](chapter-08-model-registry.md)
+9. ✅ [Chapter 9: Model Dispatch — Architecture-Specific Fast Paths](chapter-09-model-dispatch.md)
+10. ✅ [Chapter 10: Inference with vLLM — fast_inference Mode](chapter-10-fast-inference.md)
+11. ✅ [Chapter 11: Chat Templates and Tokenizer Utilities](chapter-11-chat-templates.md)
 
 ---
 
