@@ -32,13 +32,13 @@
 
 ## Part IV: Training Models
 
-12. [Chapter 12: LoRA and QLoRA — Parameter-Efficient Fine-Tuning](chapter-12-lora-qlora.md)
-13. [Chapter 13: Full Fine-Tuning and FP8 Training](chapter-13-full-finetuning-fp8.md)
-14. [Chapter 14: The Trainer — UnslothTrainer, Packing, and Padding-Free](chapter-14-trainer.md)
-15. [Chapter 15: Reinforcement Learning — GRPO and RL Workflows](chapter-15-reinforcement-learning.md)
-16. [Chapter 16: Vision and Multimodal Fine-Tuning](chapter-16-vision-multimodal.md)
-17. [Chapter 17: Embedding and Sentence-Transformer Training](chapter-17-embedding-training.md)
-18. [Chapter 18: Data Preparation — Raw Text, Synthetic Data, and Data Recipes](chapter-18-data-preparation.md)
+12. ✅ [Chapter 12: LoRA and QLoRA — Parameter-Efficient Fine-Tuning](chapter-12-lora-qlora.md)
+13. ✅ [Chapter 13: Full Fine-Tuning and FP8 Training](chapter-13-full-finetuning-fp8.md)
+14. ✅ [Chapter 14: The Trainer — UnslothTrainer, Packing, and Padding-Free](chapter-14-trainer.md)
+15. ✅ [Chapter 15: Reinforcement Learning — GRPO and RL Workflows](chapter-15-reinforcement-learning.md)
+16. ✅ [Chapter 16: Vision and Multimodal Fine-Tuning](chapter-16-vision-multimodal.md)
+17. ✅ [Chapter 17: Embedding and Sentence-Transformer Training](chapter-17-embedding-training.md)
+18. ✅ [Chapter 18: Data Preparation — Raw Text, Synthetic Data, and Data Recipes](chapter-18-data-preparation.md)
 
 ---
 
