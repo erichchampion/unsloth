@@ -52,14 +52,14 @@
 
 ## Part VI: Custom Triton Kernels — The Engine Room
 
-22. [Chapter 22: Kernel Architecture Overview](chapter-22-kernel-architecture.md)
-23. [Chapter 23: Cross-Entropy Loss Kernel](chapter-23-cross-entropy-kernel.md)
-24. [Chapter 24: Fast LoRA Kernels](chapter-24-fast-lora-kernels.md)
-25. [Chapter 25: RoPE Embedding Kernel](chapter-25-rope-kernel.md)
-26. [Chapter 26: SwiGLU, GeGLU, and Activation Kernels](chapter-26-activation-kernels.md)
-27. [Chapter 27: LayerNorm and RMSNorm Kernels](chapter-27-layernorm-kernels.md)
-28. [Chapter 28: FlexAttention and FP8 Kernels](chapter-28-flex-attention-fp8.md)
-29. [Chapter 29: MoE Grouped GEMM Kernels](chapter-29-moe-kernels.md)
+22. ✅ [Chapter 22: Kernel Architecture Overview](chapter-22-kernel-architecture.md)
+23. ✅ [Chapter 23: Cross-Entropy Loss Kernel](chapter-23-cross-entropy-kernel.md)
+24. ✅ [Chapter 24: Fast LoRA Kernels](chapter-24-fast-lora-kernels.md)
+25. ✅ [Chapter 25: RoPE Embedding Kernel](chapter-25-rope-kernel.md)
+26. ✅ [Chapter 26: SwiGLU, GeGLU, and Activation Kernels](chapter-26-activation-kernels.md)
+27. ✅ [Chapter 27: LayerNorm and RMSNorm Kernels](chapter-27-layernorm-kernels.md)
+28. ✅ [Chapter 28: FlexAttention and FP8 Kernels](chapter-28-flex-attention-fp8.md)
+29. ✅ [Chapter 29: MoE Grouped GEMM Kernels](chapter-29-moe-kernels.md)
 
 ---
 
