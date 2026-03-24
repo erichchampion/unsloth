@@ -44,9 +44,9 @@
 
 ## Part V: Saving, Exporting, and Deploying
 
-19. [Chapter 19: Saving Models — LoRA, Merged 16-bit, and 4-bit](chapter-19-saving-models.md)
-20. [Chapter 20: GGUF Export and Quantization](chapter-20-gguf-export.md)
-21. [Chapter 21: Pushing to Hugging Face Hub](chapter-21-pushing-to-hub.md)
+19. ✅ [Chapter 19: Saving Models — LoRA, Merged 16-bit, and 4-bit](chapter-19-saving-models.md)
+20. ✅ [Chapter 20: GGUF Export and Quantization](chapter-20-gguf-export.md)
+21. ✅ [Chapter 21: Pushing to Hugging Face Hub](chapter-21-pushing-to-hub.md)
 
 ---
 
