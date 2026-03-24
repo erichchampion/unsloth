@@ -83,9 +83,9 @@
 
 ## Part IX: Advanced Topics
 
-38. [Chapter 38: Import-Time Monkey Patching — How Unsloth Optimizes Libraries](chapter-38-monkey-patching.md)
-39. [Chapter 39: Multi-GPU Training](chapter-39-multi-gpu.md)
-40. [Chapter 40: Attention Dispatch and Memory Optimization](chapter-40-attention-dispatch.md)
+38. ✅ [Chapter 38: Import-Time Monkey Patching — How Unsloth Optimizes Libraries](chapter-38-monkey-patching.md)
+39. ✅ [Chapter 39: Multi-GPU Training](chapter-39-multi-gpu.md)
+40. ✅ [Chapter 40: Attention Dispatch and Memory Optimization](chapter-40-attention-dispatch.md)
 
 ---
 
