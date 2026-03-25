@@ -152,7 +152,7 @@ The fallback ensures every Hugging Face model works with Unsloth, even without a
 | Granite | `granite.py` | ⚠️ Disabled | Fallback (torch.compile) |
 | Falcon H1 | `falcon_h1.py` | ⚠️ Disabled | Fallback (torch.compile) |
 | GLM-4 MoE | `glm4_moe.py` | ⚠️ Fallback | Fallback (torch.compile) |
-| DeepSeek | `deepseek.py` | ✅ Active | Full (MoE + Triton) |
+| DeepSeek | `_deepseek.py` | ✅ Active | Full (MoE + Triton) |
 
 ---
 

@@ -175,7 +175,7 @@ tl.store(logits_ptr + col_offsets, dloss * y) # Write gradient in-place
 
 ---
 
-## 23.3 Memory Savings
+## 23.4 Memory Savings
 
 | Model | Vocab | Standard Peak | Unsloth Peak | Reduction |
 |-------|-------|--------------|-------------|-----------|
@@ -187,7 +187,7 @@ The savings grow proportionally with vocabulary size, making this kernel increas
 
 ---
 
-## 23.4 Gradient Computation
+## 23.5 Gradient Computation
 
 The fused kernel also computes gradients without materializing the full Jacobian. During the backward pass:
 
@@ -202,7 +202,7 @@ The fused kernel also computes gradients without materializing the full Jacobian
 
 ---
 
-## 23.5 Configuration
+## 23.6 Configuration
 
 The kernel is enabled automatically by `Fast*Model` patching. It replaces `nn.CrossEntropyLoss` in the model's forward pass:
 
@@ -213,7 +213,7 @@ model.loss_fn = fast_cross_entropy_loss  # Replace standard loss
 
 The chunk size is auto-tuned by Triton's `@autotune` decorator based on the specific GPU's characteristics.
 
-## 23.6 Label Smoothing Support
+## 23.7 Label Smoothing Support
 
 The fused kernel also supports label smoothing — a regularization technique that softens the one-hot target distribution:
 

@@ -156,5 +156,5 @@ total_loss = language_model_loss + balance_loss
 | MoE kernel directory | `unsloth/kernels/moe/` |
 | Grouped GEMM | `unsloth/kernels/moe/grouped_gemm/` |
 | Autotuning cache | `unsloth/kernels/moe/autotune_cache.py` |
-| DeepSeek MoE model | `unsloth/models/deepseek.py` |
+| DeepSeek MoE model | `unsloth/registry/_deepseek.py` |
 | Qwen 3 MoE model | `unsloth/models/qwen3_moe.py` |

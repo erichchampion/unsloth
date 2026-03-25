@@ -2,10 +2,10 @@
 # Customize this file for your book's metadata
 
 # Book title (required)
-title: "Inside OpenCode"
+title: "Inside Unsloth"
 
 # Subtitle (optional)
-subtitle: "How an AI Coding Agent Works"
+subtitle: "Unsloth is an open-source toolkit for running and fine-tuning large language models on your own hardware"
 
 # Author name(s) (required)
 # For multiple authors, use a list:
@@ -34,7 +34,7 @@ subjects:
   - "Programming"
 
 # ISBN (optional)
-isbn: "979-8-9937022-3-0"
+#isbn: "979-8-9937022-3-0"
 
 # Copyright/rights statement (optional)
 rights: "© 2026 Erich Champion. All rights reserved."
