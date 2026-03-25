@@ -5,7 +5,7 @@
 title: "Inside Unsloth"
 
 # Subtitle (optional)
-subtitle: "Unsloth is an open-source toolkit for running and fine-tuning large language models on your own hardware"
+subtitle: "How the Fastest LLM Fine-Tuning Library Works"
 
 # Author name(s) (required)
 # For multiple authors, use a list:
@@ -25,7 +25,7 @@ language: "en"
 
 # Book description/summary (optional)
 description: |
-  A comprehensive review of OpenCode, an open-source AI coding assistant.
+  Inside Unsloth is the first book to crack open the Unsloth codebase and walk you through every layer — from import-time monkey patching to hand-written Triton kernels, from 4-bit quantized LoRA to fused cross-entropy loss, from model architecture dispatching to the Studio training interface.
 
 # Subject/category (optional)
 subjects:

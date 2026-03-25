@@ -10,6 +10,13 @@ dita/
 *.log
 
 # DITA-OT plugins (installed locally)
-pdf-theme/
+pdf-theme/*
+!pdf-theme/cfg/
+pdf-theme/cfg/*
+!pdf-theme/cfg/common/
+pdf-theme/cfg/common/*
+!pdf-theme/cfg/common/vars/
+pdf-theme/cfg/common/vars/*
+!pdf-theme/cfg/common/vars/en.xml
 pdf-theme-syntax-highlight/
 pdf-theme-syntax-highlight.zip
