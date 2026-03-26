@@ -895,13 +895,20 @@ def md_to_dita_topic(md_path: str, topic_id: str, title: str, file_to_topic: dic
             continue
         elif element.name in ["h2", "h3", "h4", "h5", "h6"]:
             # Convert headings to sections with anchor IDs
-            text = element.get_text(strip=True)
+            # Use separator=' ' to preserve word boundaries around inline
+            # elements like <code> (get_text(strip=True) would collapse
+            # "The <code>pyproject.toml</code> Dep..." into
+            # "Thepyproject.tomlDep...")
+            import re
+            plain_text = re.sub(r'\s+', ' ', element.get_text(separator=' ')).strip()
             # Generate anchor slug for cross-references
-            anchor_id = generate_anchor_slug(text)
+            anchor_id = generate_anchor_slug(plain_text)
+            # Build rich title content preserving inline formatting (codeph, b, i)
+            title_content = convert_element_content(element)
             # Add anchor element before section for cross-references
             # Using <ph> (phrase) element with id - DITA-OT will convert this to <span id="..."> in HTML
             dita_parts.append(f'    <p><ph id="{anchor_id}"/></p>')
-            dita_parts.append(f'    <section><title>{escape_xml(text)}</title></section>')
+            dita_parts.append(f'    <section><title>{title_content}</title></section>')
         elif element.name == "p":
             # Handle paragraphs with potential links
             dita_parts.append('    <p>' + convert_element_content(element) + '</p>')
