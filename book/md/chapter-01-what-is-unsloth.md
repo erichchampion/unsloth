@@ -211,18 +211,18 @@ User Script
 |              TRAINING LOOP (Ch 14)               |
 |                                                  |
 |  +--------------------------------------------+  |
-|  | Forward Pass                                |  |
+|  | Forward Pass                               |  |
 |  |  - RoPE kernel (Ch 25)                     |  |
 |  |  - Attention (Ch 40: Flash/SDPA/manual)    |  |
 |  |  - SwiGLU kernel (Ch 26)                   |  |
 |  |  - RMSNorm kernel (Ch 27)                  |  |
 |  |  - Cross-entropy kernel (Ch 23)            |  |
 |  +--------------------------------------------+  |
-|  | Backward Pass                               |  |
+|  | Backward Pass                              |  |
 |  |  - Fast LoRA backward (Ch 24)              |  |
 |  |  - Gradient checkpointing (Ch 12)          |  |
 |  +--------------------------------------------+  |
-|  | Optimizer Step                              |  |
+|  | Optimizer Step                             |  |
 |  |  - Embedding LR separation (Ch 14)         |  |
 |  +--------------------------------------------+  |
 |                                                  |

@@ -64,11 +64,11 @@ Client                          Server
   │                               ├── Load model (if not loaded)
   │                               ├── Apply chat template
   │                               ├── Start generation
-  │←── SSE: {"token": "The"}  ───┤
-  │←── SSE: {"token": " answer"} ┤
-  │←── SSE: {"token": " is"}  ───┤
-  │←── SSE: {"token": " 42"}  ───┤
-  │←── SSE: {"done": true}  ─────┤
+  │←── SSE: {"token": "The"}  ────┤
+  │←── SSE: {"token": " answer"} ─┤
+  │←── SSE: {"token": " is"}  ────┤
+  │←── SSE: {"token": " 42"}  ────┤
+  │←── SSE: {"done": true}  ──────┤
   │                               │
 ```
 
