@@ -131,6 +131,8 @@ def generate_anchor_slug(text: str) -> str:
 # Previewer at the default font size on a 6" profile, not settled numbers.
 CODE_LINE_WARN = 56
 CODE_LINE_MAX = 64
+# A token wider than this cannot break, and is clipped rather than wrapped.
+CODE_TOKEN_MAX = 58
 CODE_LINE_REPORT = "code-line-report.txt"
 
 
@@ -144,6 +146,7 @@ def report_long_code_lines(md_dir: Path) -> int:
     Returns the number of lines over CODE_LINE_MAX.
     """
     findings = []
+    unbreakable = []
 
     for md_file in sorted(md_dir.glob("*.md")):
         in_fence = False
@@ -165,6 +168,22 @@ def report_long_code_lines(md_dir: Path) -> int:
 
             if len(line) > CODE_LINE_WARN:
                 findings.append((md_file.name, number, len(line), line))
+
+            # An unbreakable run wider than a line is worse than a long line.
+            # The stylesheet uses `word-break: normal`, because break-all split
+            # words mid-token on Kindle even when the whole word would have
+            # fitted on the next line. The cost is that a token too wide to fit
+            # cannot break at all, and `overflow` is supported only as `hidden`,
+            # so it is clipped and the text is lost.
+            for token in line.split():
+                if len(token) > CODE_TOKEN_MAX:
+                    unbreakable.append((md_file.name, number, len(token), token))
+
+    if unbreakable:
+        log(f"✂️  {len(unbreakable)} unbreakable token(s) over {CODE_TOKEN_MAX} "
+            f"characters — these clip rather than wrap:")
+        for name, number, length, token in sorted(unbreakable, key=lambda x: -x[2]):
+            log(f"   {name}:{number} ({length}) {token[:60]}")
 
     over_max = [f for f in findings if f[2] > CODE_LINE_MAX]
 

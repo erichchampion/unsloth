@@ -120,16 +120,29 @@ def transform_codeblocks(soup):
 
         lines = _split_lines(container, soup)
 
+        # Rebuild as a <div> of <div>s.
+        #
+        # The first attempt used <pre> with one `display: block` <span> per
+        # line. Kindle Previewer ignored `padding-left` and `text-indent` on
+        # those spans, so a wrapped line came back flush against the line above
+        # with nothing marking it as a continuation. Box properties are honoured
+        # on a real block element, and <pre> cannot hold block children — it
+        # takes phrasing content only — so the container becomes a <div> too.
+        # Each line keeps a <code> inside it: KDP §11.3.8 lists <code> with
+        # <pre> as monospace-rendered, which is the fallback if the embedded
+        # face is unavailable.
+        block = soup.new_tag("div")
+        block["class"] = kept
+
         # DITA-OT ends every code block with a trailing newline; that produces
         # one empty trailing line which would render as a blank line.
         while lines and not lines[-1]:
             lines.pop()
 
-        container.clear()
-
         for parts in lines:
-            span = soup.new_tag("span")
-            span["class"] = ["cl"]
+            line = soup.new_tag("div")
+            line["class"] = ["cl"]
+            holder = soup.new_tag("code")
 
             if parts:
                 _harden_leading_indent(parts)
@@ -138,9 +151,11 @@ def transform_codeblocks(soup):
                 parts = [" "]
 
             for part in parts:
-                span.append(part)
-            container.append(span)
+                holder.append(part)
+            line.append(holder)
+            block.append(line)
 
+        pre.replace_with(block)
         count += 1
 
     return count

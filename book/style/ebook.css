@@ -13,10 +13,10 @@
  *      Every declaration here is longhand.
  *
  *   2. `white-space` is supported only as `nowrap` or `normal` — neither `pre`
- *      nor `pre-wrap`. Whitespace inside <pre> therefore cannot be relied on,
- *      which is why generate-epub.py emits one block-level <span class="cl">
- *      per logical line and hard-spaces the leading indentation. Nothing here
- *      declares `white-space`.
+ *      nor `pre-wrap`. Preformatted whitespace therefore cannot be relied on,
+ *      which is why epub_writer.py emits one <div class="cl"> per logical line
+ *      and hard-spaces the leading indentation. Nothing here declares
+ *      `white-space`.
  *
  *   3. `overflow` is supported only as `hidden`, and `word-wrap` is ignored
  *      outright. There is no scrollable region and no soft-wrap override:
@@ -127,7 +127,7 @@ blockquote, .lq {
  * costs more legibility at 0.8em than the delimiting is worth; a left rule
  * reads cleanly at any size and survives the reader's dark theme. */
 
-pre.codeblock {
+div.codeblock {
   font-family: "BookMono", monospace;
   font-size: 0.8em;
   line-height: 1.35;
@@ -142,11 +142,25 @@ pre.codeblock {
   border-left-style: solid;
   border-left-color: #999999;
   text-align: left;
-  word-break: break-all;
   hyphens: none;
 }
 
-pre.codeblock code {
+/* Deliberately NOT `word-break: break-all`.
+ *
+ * Kindle Previewer showed it breaking mid-word even when the whole word would
+ * have fitted on the next line — "…correctness and styl" / "e.", — where a
+ * browser only breaks inside a word that cannot fit a line on its own. Normal
+ * breaking keeps words intact.
+ *
+ * The cost is that a token longer than one line cannot break at all, and
+ * `overflow` is supported only as `hidden`, so it is clipped rather than
+ * wrapped. generate-dita.py reports any such token so it can be shortened at
+ * source; there are two in these books today. */
+div.codeblock {
+  word-break: normal;
+}
+
+div.codeblock code {
   font-family: inherit;
   font-size: inherit;
   font-weight: inherit;
@@ -158,9 +172,18 @@ pre.codeblock code {
  * the rule, and a line too long to fit wraps to a visibly indented
  * continuation, the way an editor's soft wrap reads. This only works per-line
  * — `text-indent` applies to the first formatted line of a block, so applying
- * it to the <pre> as a whole would indent every hard line break instead of
- * every wrap. Hence one block per line. */
-pre.codeblock .cl {
+ * it to the container as a whole would indent every hard line break instead of
+ * every wrap. Hence one block per line.
+ *
+ * These are <div>s rather than <span display:block> because Kindle Previewer
+ * ignored both `padding-left` and `text-indent` on the spans: a wrapped line
+ * came back flush with the line above it, with no continuation marker at all.
+ * A real block element is the standard way to get box properties honoured.
+ * That is also why the container is a <div> and not a <pre> — <pre> takes
+ * phrasing content only, so it cannot hold block children. The monospace
+ * fallback that <pre> used to provide now comes from the <code> inside each
+ * line, which KDP §11.3.8 lists alongside <pre> as monospace-rendered. */
+div.codeblock .cl {
   display: block;
   padding-left: 2em;
   text-indent: -2em;
@@ -180,23 +203,28 @@ pre.codeblock .cl {
  * the exact figure in Kindle Previewer — it depends on the page margins the
  * device applies, which are not something CSS can read. */
 
-pre.codeblock.diagram {
+div.codeblock.diagram {
   font-size: 0.65em;
   line-height: 1.2;
-  word-break: normal;    /* never break a drawing mid-glyph */
 }
 
-pre.codeblock.diagram .cl {
+div.codeblock.diagram .cl {
   padding-left: 0;
   text-indent: 0;        /* a wrapped diagram is already lost; don't mark it */
 }
 
 /* Inline code. No background or border — at inline scale both cost more in
- * ragged line boxes than they return. */
+ * ragged line boxes than they return.
+ *
+ * `word-break: normal` for the same reason as the code blocks: with break-all
+ * Previewer split `Instance.project` across a line as "Instanc" / "e.project"
+ * in the middle of running prose. An identifier that will not fit now pushes
+ * to the next line instead, which loosens justification but keeps the name
+ * readable. */
 code.codeph {
   font-family: "BookMono", monospace;
   font-size: 0.85em;
-  word-break: break-all;
+  word-break: normal;
 }
 
 /* --------------------------------------------------- syntax highlighting -- */
