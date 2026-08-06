@@ -371,11 +371,16 @@ nav li {
  * <style> is stripped during packaging so that ebook.css is the only
  * stylesheet in the container; these rules replace it. */
 
+/* These two are <h1> elements inside <li>, so they inherit the chapter-opening
+ * `page-break-before: always` above and would otherwise split the TOC across
+ * one page per part. Only latent while the bookmaps are flat. */
+
 .toc-part-heading {
   font-weight: bold;
   font-size: 1.15em;
   margin-top: 1.2em;
   margin-bottom: 0.4em;
+  page-break-before: auto;
 }
 
 .toc-appendix-heading {
@@ -383,6 +388,7 @@ nav li {
   font-size: 1.1em;
   margin-top: 1.2em;
   margin-bottom: 0.4em;
+  page-break-before: auto;
 }
 
 .chapter-link {

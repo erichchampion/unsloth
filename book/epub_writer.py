@@ -29,6 +29,7 @@ The Amazon Kindle Publishing Guidelines drive three decisions here:
     are TTF, subsetted here to the glyphs the book actually uses.
 """
 
+import re
 import shutil
 import zipfile
 from datetime import datetime, timezone
@@ -145,7 +146,7 @@ def transform_codeblocks(soup):
             holder = soup.new_tag("code")
 
             if parts:
-                _harden_leading_indent(parts)
+                _harden_whitespace(parts)
             else:
                 # Preserve deliberate blank lines between logical stanzas.
                 parts = [" "]
@@ -196,39 +197,42 @@ def _split_lines(node, soup):
     return lines
 
 
-def _harden_leading_indent(parts):
-    """Harden the indentation at the start of one assembled line, in place.
+def _harden_whitespace(parts):
+    """Harden every alignment run in one assembled line, in place.
 
-    The first piece of a line is usually a bare string, but not always: a line
-    inside a triple-quoted string or a block comment begins with the cloned
-    token span instead, and that indentation is part of the program too. So the
-    first text run is located wherever it sits.
+    Runs of two or more spaces are what hold a line's shape: the columns of an
+    ASCII diagram, an aligned comment, a table of values. Ordinary HTML
+    collapses them to one, and nothing here can ask otherwise — `white-space`
+    is supported only as `nowrap` or `normal`, so the CSS declares it nowhere.
+    A run of no-break spaces survives collapsing and is the only way to keep
+    the alignment.
+
+    Single spaces are deliberately left alone. They are the soft-wrap
+    opportunities that let an over-long line break at a word boundary rather
+    than overflow, and there is no scrollable region to overflow into.
+
+    Every text run in the line is walked, not just the first: a line inside a
+    triple-quoted string or a block comment begins with a cloned token span
+    rather than a bare string, and a diagram's columns sit between spans as
+    often as inside them.
     """
-    if isinstance(parts[0], str):
-        parts[0] = _harden_indent(parts[0])
-        return
-
-    node = parts[0]
-    for descendant in node.descendants:
-        if isinstance(descendant, str):
-            hardened = _harden_indent(str(descendant))
-            if hardened != descendant:
-                descendant.replace_with(hardened)
-            return
+    for index, part in enumerate(parts):
+        if isinstance(part, str):
+            parts[index] = _harden_runs(part)
+            continue
+        for descendant in list(part.descendants):
+            if isinstance(descendant, str):
+                hardened = _harden_runs(str(descendant))
+                if hardened != descendant:
+                    descendant.replace_with(hardened)
 
 
-def _harden_indent(text):
-    """Replace a run of leading spaces with no-break spaces (U+00A0).
+_RUN = re.compile(r"  +")
 
-    Only the leading run is touched. Interior whitespace is left alone: it is
-    not what carries structure, and hard-spacing it would suppress the soft
-    wrap opportunities that let a long line break somewhere sensible.
-    """
-    stripped = text.lstrip(" ")
-    indent = len(text) - len(stripped)
-    if not indent:
-        return text
-    return " " * indent + stripped
+
+def _harden_runs(text):
+    """Replace every run of two or more spaces with no-break spaces."""
+    return _RUN.sub(lambda m: " " * len(m.group(0)), text)
 
 
 # --------------------------------------------------------------------------
@@ -399,11 +403,16 @@ def _identifier(metadata):
     isbn = metadata.get("isbn")
     if isbn:
         return f"urn:isbn:{str(isbn).replace('-', '')}"
+
+    # Derived from the title rather than random. A fresh UUID per build gives
+    # every rebuild a new identity, so readers treat it as a different book and
+    # carry over neither annotations nor reading position.
     import uuid
-    return f"urn:uuid:{uuid.uuid4()}"
+    seed = f"{metadata.get('title', '')}|{metadata.get('author', '')}"
+    return f"urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
 
 
-def build_opf(metadata, manifest, spine, identifier, cover_id):
+def build_opf(metadata, manifest, spine, identifier, cover_id, toc_href=None):
     """The package document, EPUB 3.0.
 
     A legacy <guide> is emitted alongside the landmarks nav because §5.3.1 asks
@@ -461,14 +470,16 @@ def build_opf(metadata, manifest, spine, identifier, cover_id):
 
     parts.append('  <guide>')
     parts.append('    <reference type="cover" title="Cover" href="titlepage.html"/>')
-    parts.append('    <reference type="toc" title="Table of Contents" href="toc.html"/>')
+    if toc_href:
+        parts.append(f'    <reference type="toc" title="Table of Contents"'
+                     f' href="{toc_href}"/>')
     parts.append('  </guide>')
 
     parts.append('</package>')
     return "\n".join(parts) + "\n"
 
 
-def build_nav(metadata, entries):
+def build_nav(metadata, entries, toc_href=None):
     """nav.xhtml — the logical TOC plus the landmarks list.
 
     Kindle supports two levels of nesting (§5.2), so chapters carry their
@@ -509,9 +520,13 @@ def build_nav(metadata, entries):
         '    <h1>Landmarks</h1>',
         '    <ol>',
         '      <li><a epub:type="cover" href="titlepage.html">Cover</a></li>',
-        '      <li><a epub:type="toc" href="toc.html">Table of Contents</a></li>',
+    ]
+    if toc_href:
+        parts.append(f'      <li><a epub:type="toc" href="{toc_href}">'
+                     f'Table of Contents</a></li>')
+    parts += [
         '      <li><a epub:type="bodymatter" href="'
-        + (entries[0]["href"] if entries else "toc.html")
+        + (entries[0]["href"] if entries else (toc_href or "nav.xhtml"))
         + '">Start of Content</a></li>',
         '    </ol>',
         '  </nav>',
@@ -729,7 +744,9 @@ def write_epub(metadata, chapter_files, chapter_structure, toc_file,
 
     # ---- navigation -----------------------------------------------------
     identifier = _identifier(metadata)
-    (oebps / "nav.xhtml").write_text(build_nav(metadata, entries), encoding="utf-8")
+    toc_href = toc_name if (oebps / toc_name).exists() else None
+    (oebps / "nav.xhtml").write_text(
+        build_nav(metadata, entries, toc_href), encoding="utf-8")
     (oebps / "toc.ncx").write_text(build_ncx(metadata, entries, identifier), encoding="utf-8")
 
     # ---- manifest and spine ---------------------------------------------
@@ -767,7 +784,8 @@ def write_epub(metadata, chapter_files, chapter_structure, toc_file,
         spine.append(item_id)
 
     (oebps / "content.opf").write_text(
-        build_opf(metadata, manifest, spine, identifier, cover_id), encoding="utf-8")
+        build_opf(metadata, manifest, spine, identifier, cover_id, toc_href),
+        encoding="utf-8")
 
     # ---- zip ------------------------------------------------------------
     _zip_epub(stage, output_path)

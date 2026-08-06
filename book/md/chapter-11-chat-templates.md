@@ -92,7 +92,7 @@ Each template family can optionally define a default system message:
 ```python
 DEFAULT_SYSTEM_MESSAGE["vicuna"] = \
     "A chat between a curious user and an artificial intelligence assistant. " \
-    "The assistant gives helpful, detailed, and "
+    "The assistant gives helpful, detailed, and " \
     "polite answers to the user's questions."
 # No default system message
 DEFAULT_SYSTEM_MESSAGE["llama-3"] = None
