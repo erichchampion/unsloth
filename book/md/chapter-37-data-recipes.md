@@ -29,9 +29,13 @@ Creating high-quality training datasets is often the hardest part of fine-tuning
 Data Recipes uses a visual node-graph editor where each node represents a processing step:
 
 ```
-[Document Upload] → [Chunking] → [Prompt Template] → [LLM Generation] → [Validation] → [Export]
-     PDF, CSV          Split by       Define Q&A         Generate with        Validate        HF datasets
-     DOCX, JSON       paragraphs     format template    loaded model         JSON schema       format
+[Document Upload] → [Chunking] → [Prompt Template]
+  PDF, CSV, DOCX      Split by      Define Q&A
+  JSON                paragraphs    format template
+        │
+        └─→ [LLM Generation] → [Validation] → [Export]
+              Generate with       Validate      HF datasets
+              loaded model        JSON schema   format
 ```
 
 ### Node Types
@@ -70,7 +74,8 @@ The chunker node offers multiple strategies:
 chunks = split_by_tokens(text, chunk_size=512, overlap=64)
 
 # Semantic chunking (smarter, slower)
-chunks = split_by_semantic_boundaries(text)  # Paragraph/section breaks
+# Paragraph/section breaks
+chunks = split_by_semantic_boundaries(text)
 
 # Sliding window
 chunks = sliding_window(text, window=1024, stride=256)
@@ -84,7 +89,8 @@ The Generator node uses the loaded model (or a separate vLLM instance via Synthe
 
 ```python
 # Example prompt template for Q&A generation:
-template = """Based on the following context, generate a question and answer pair.
+template = """\
+Based on the following context, generate a question and answer pair.
 
 Context: {chunk}
 
@@ -141,7 +147,8 @@ Validated examples are exported in Hugging Face `datasets`-compatible format:
 # Output format (JSONL):
 {"messages": [
     {"role": "user", "content": "What is photosynthesis?"},
-    {"role": "assistant", "content": "Photosynthesis is the process by which..."}
+    {"role": "assistant",
+     "content": "Photosynthesis is the process by which..."}
 ]}
 ```
 

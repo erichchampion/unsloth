@@ -114,7 +114,8 @@ def format_reward(completions, prompt):
 
 # Usage: multiple rewards are combined
 trainer = GRPOTrainer(
-    reward_funcs=[accuracy_reward, format_reward],  # Both applied
+    # Both applied
+    reward_funcs=[accuracy_reward, format_reward],
     ...
 )
 ```
@@ -135,12 +136,18 @@ For code-generation tasks, RL rewards can come from actually executing the gener
 
 ```python
 from unsloth_zoo.rl_environments import (
-    check_python_modules,         # Verify allowed modules
-    create_locked_down_function,  # Create sandboxed execution context
-    execute_with_time_limit,      # Run code with timeout
-    Benchmarker,                  # Benchmark reward computation
-    is_port_open,                 # Check if sandbox server is available
-    launch_openenv,               # Launch sandbox environment
+    # Verify allowed modules
+    check_python_modules,
+    # Create sandboxed execution context
+    create_locked_down_function,
+    # Run code with timeout
+    execute_with_time_limit,
+    # Benchmark reward computation
+    Benchmarker,
+    # Check if sandbox server is available
+    is_port_open,
+    # Launch sandbox environment
+    launch_openenv,
 )
 ```
 
@@ -191,7 +198,7 @@ trainer = GRPOTrainer(
     args = GRPOConfig(
         output_dir = "./grpo_output",
         per_device_train_batch_size = 1,
-        num_generations = 4,  # Generate 4 completions per prompt
+        num_generations = 4, # Generate 4 completions per prompt
     ),
     train_dataset = prompts_dataset,
     reward_funcs = [accuracy_reward, format_reward],

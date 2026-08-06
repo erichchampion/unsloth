@@ -48,7 +48,8 @@ from unsloth_cli.commands.ui import ui
 from unsloth_cli.commands.studio import studio_app
 
 app = typer.Typer(
-    help = "Command-line interface for Unsloth training, inference, and export.",
+    help = "Command-line interface for Unsloth training, "
+           "inference, and export.",
     context_settings = {"help_option_names": ["-h", "--help"]},
 )
 
@@ -57,7 +58,9 @@ app.command()(inference)
 app.command()(export)
 app.command("list-checkpoints")(list_checkpoints)
 app.command()(ui)
-app.add_typer(studio_app, name = "studio", help = "Unsloth Studio commands.")
+app.add_typer(
+    studio_app, name = "studio",
+    help = "Unsloth Studio commands.")
 ```
 
 Notice the two registration patterns: `app.command()` for flat commands and `app.add_typer()` for the `studio` subcommand group. This means `unsloth studio` is itself a Typer app with its own sub-commands (like `unsloth studio setup`).
@@ -85,10 +88,13 @@ The CLI's configuration is built on a hierarchy of Pydantic models defined in `c
 # unsloth_cli/config.py — the configuration hierarchy
 class Config(BaseModel):
     model: Optional[str] = None
-    data: DataConfig         # dataset, local_dataset, format_type
+    # dataset, local_dataset, format_type
+    data: DataConfig
     training: TrainingConfig # max_seq_length, learning_rate, batch_size, etc.
-    lora: LoraConfig         # lora_r, lora_alpha, target_modules, etc.
-    logging: LoggingConfig   # wandb, tensorboard settings
+    # lora_r, lora_alpha, target_modules, etc.
+    lora: LoraConfig
+    # wandb, tensorboard settings
+    logging: LoggingConfig
 ```
 
 ### DataConfig
@@ -97,8 +103,8 @@ Controls where training data comes from:
 
 ```python
 class DataConfig(BaseModel):
-    dataset: Optional[str] = None          # HF dataset name
-    local_dataset: Optional[List[str]] = None  # Local file paths
+    dataset: Optional[str] = None             # HF dataset name
+    local_dataset: Optional[List[str]] = None # Local file paths
     format_type: Literal["auto", "alpaca", "chatml", "sharegpt"] = "auto"
 ```
 
@@ -131,7 +137,9 @@ class LoraConfig(BaseModel):
     lora_r: int = 64
     lora_alpha: int = 16
     lora_dropout: float = 0.0
-    target_modules: str = "q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj"
+    target_modules: str = (
+        "q_proj,k_proj,v_proj,o_proj,"
+        "gate_proj,up_proj,down_proj")
     finetune_vision_layers: bool = True
     finetune_language_layers: bool = True
 ```
@@ -200,11 +208,11 @@ unsloth train --model ... --dataset ... [--config training.yaml]
     ├─ 3. Validate tokens (HF, WandB)       Check env vars and CLI args
     ├─ 4. Check --dry-run                   If set, dump config and exit
     ├─ 5. Validate model + dataset exist    Early error if missing
-    ├─ 6. Detect LoRA adapter               If checkpoint has adapter_config.json
+    ├─ 6. Detect LoRA adapter               If ckpt has adapter_config.json
     │
     ├─ 7. UnslothTrainer()                  Instantiate trainer backend
     ├─ 8. trainer.load_model(...)           Load model via FastLanguageModel
-    ├─ 9. trainer.prepare_model_for_training(...)  Apply LoRA / gradient checkpointing
+    ├─ 9. trainer.prepare_model_for_training(...)  Apply LoRA + grad ckpt
     ├─ 10. trainer.load_and_format_dataset(...)    Load + format dataset
     ├─ 11. trainer.start_training(...)      Launch training in background thread
     │
@@ -220,7 +228,8 @@ The trainer runs in a background thread, allowing the CLI to handle `KeyboardInt
 The `export` command supports four output formats:
 
 ```bash
-unsloth export ./outputs/checkpoint-100 ./exported --format gguf --quantization q4_k_m
+unsloth export ./outputs/checkpoint-100 ./exported \
+  --format gguf --quantization q4_k_m
 ```
 
 | Format | Flag | Description |

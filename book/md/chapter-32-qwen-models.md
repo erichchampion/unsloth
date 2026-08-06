@@ -32,7 +32,8 @@ Qwen 2's architecture is so similar to Llama that `FastQwen2Model` is essentiall
 ```python
 class FastQwen2Model(FastLlamaModel):
     @staticmethod
-    def from_pretrained(model_name, max_seq_length, load_in_4bit, ...):
+    def from_pretrained(
+        model_name, max_seq_length, load_in_4bit, ...):
         # Delegates almost entirely to FastLlamaModel.from_pretrained()
         # Differences:
         #   - Model architecture name: "Qwen2ForCausalLM"
@@ -124,9 +125,9 @@ The MoE forward pass uses the grouped GEMM kernel from `kernels/moe/`:
 
 ```python
 # MoE forward (simplified):
-router_logits = self.gate(x)                    # [batch*seq, num_experts]
+router_logits = self.gate(x)   # [batch*seq, num_experts]
 top_k_scores, top_k_indices = topk(router_logits, k=8)
-expert_outputs = grouped_gemm(                   # Single fused kernel
+expert_outputs = grouped_gemm( # Single fused kernel
     expert_weights=self.experts,
     inputs=x,
     indices=top_k_indices,

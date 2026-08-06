@@ -10,12 +10,16 @@ from pathlib import Path
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+import epub_writer
+
 # --- CONFIGURATION ---
 DITA_DIR = "dita"
 HTML_OUTPUT_DIR = "dita/out-html5"
 METADATA_FILE = "metadata.yaml"  # Metadata file shared with PDF generation
-DITA_COMMAND = "dita"
-EBOOK_CONVERT_COMMAND = "/Applications/calibre.app/Contents/MacOS/ebook-convert"
+STYLE_DIR = "style"  # ebook.css and the embedded fonts
+# publish-book.zsh builds its own venv and runs non-interactively, so the
+# toolkit location cannot depend on an interactive shell's PATH.
+DITA_COMMAND = os.environ.get("DITA_COMMAND", "dita")
 LOG_FILE = "generate-epub.log"
 PRISM_THEME = "solarized"  # Options: default, solarized, bootstrap
 
@@ -378,13 +382,21 @@ def parse_bookmap_structure(ditamap_path: Path) -> list:
         log(f"❌ Error parsing bookmap: {e}")
         return []
 
-def merge_html_by_chapter(chapter_structure: list, html_dir: Path, output_dir: Path) -> tuple[list, dict]:
+def merge_html_by_chapter(chapter_structure: list, html_dir: Path, output_dir: Path,
+                          rename_map: dict = None) -> tuple[list, dict]:
     """Merge HTML files by chapter.
 
     Args:
         chapter_structure: List of chapter dicts from parse_bookmap_structure()
         html_dir: Directory containing topic HTML files
         output_dir: Directory to write merged chapter HTML files
+        rename_map: old HTML filename → new filename, from the rename pass.
+            Without it, any topic renamed to something other than its DITA stem
+            cannot be resolved — which is how the copyright page went missing:
+            the bookmap references preface_copyright.dita, the rename pass had
+            already moved preface_copyright.html to copyright.html, and the
+            stem-matching fallback below never connected the two, so front
+            matter shipped as an empty page.
 
     Returns:
         Tuple of (list of chapter HTML file paths, topic-to-chapter mapping dict)
@@ -416,7 +428,18 @@ def merge_html_by_chapter(chapter_structure: list, html_dir: Path, output_dir: P
             else:
                 log(f"   ⚠️  Warning: Mapped {topic_base} -> {html_name} but file not found")
 
-    # Also map other HTML files by exact name match (like preface_copyright)
+    # Follow the rename pass, so topics that were moved to a different basename
+    # are still reachable from the href the bookmap uses.
+    for old_name, new_name in (rename_map or {}).items():
+        old_stem = Path(old_name).stem
+        if old_stem in dita_to_html:
+            continue
+        renamed = html_dir / new_name
+        if renamed.exists():
+            dita_to_html[old_stem] = renamed
+            log(f"   📄 Mapped {old_stem} -> {new_name} (renamed)")
+
+    # Also map other HTML files by exact name match
     for html_file in html_dir.glob("*.html"):
         stem = html_file.stem
         if stem not in dita_to_html:
@@ -901,11 +924,20 @@ def create_toc_html(chapter_structure: list, chapter_files: list, output_dir: Pa
     with open(toc_file, 'w', encoding='utf-8') as f:
         f.write('\n'.join(html))
 
-    # Count chapters and appendices
-    num_chapters = sum(len(part['chapter_indices']) for part in part_structure)
+    # Count what was actually written, not just what was nested under a Part.
+    # The old count reported chapters-inside-Parts only, so a flat bookmap —
+    # which is what both books have — logged "0 Parts, 0 Chapters, 0 Appendices"
+    # for a TOC page that in fact listed every chapter.
     num_appendices = len(appendices)
+    num_chapters = sum(
+        1 for ch in chapter_structure
+        if ch['type'] == 'chapter'
+        and not ch.get('title', '').startswith('Part ')
+        and not ch.get('title', '').startswith('Appendix ')
+    )
 
-    log(f"✅ Created hierarchical TOC with {len(part_structure)} Parts, {num_chapters} Chapters, and {num_appendices} Appendices")
+    log(f"✅ Created TOC page: {len(part_structure)} Parts, "
+        f"{num_chapters} Chapters, {num_appendices} Appendices")
     return toc_file
 
 def convert_cross_references(chapter_files: list, topic_to_chapter: dict, chapter_structure: list = None) -> int:
@@ -1256,150 +1288,52 @@ def unwrap_semantic_elements(html_dir: Path) -> bool:
 
     return True
 
-def convert_to_epub(metadata: dict, toc_file: Path, chapter_files: list, output_epub: str, epub_input_dir: Path = None) -> bool:
-    """Convert chapter HTML files to EPUB using Calibre's ebook-convert.
+def convert_to_epub(metadata: dict, toc_file: Path, chapter_files: list,
+                    chapter_structure: list, output_epub: str) -> bool:
+    """Package the chapter HTML files as an EPUB 3.
+
+    This used to shell out to Calibre's ebook-convert. Calibre rebuilds the
+    stylesheet from scratch — recomputing every rule, renaming every class to
+    `.calibreN`, and dropping classes it finds no rules for. Because the merged
+    chapter files link `commonltr.css` and `common-extended.css` by relative
+    path while those files live one directory up, Calibre resolved nothing for
+    Prism's `.token` classes and stripped them: the published EPUBs carried
+    highlighting markup with no highlighting and not one colour declaration. It
+    also produced EPUB 2 with no navigation document, and overrode the code
+    font-size through its font-rescaling filter.
+
+    epub_writer builds the container directly, so the markup can be shaped for
+    what Kindle actually supports. See its module docstring for the specifics.
 
     Args:
         metadata: EPUB metadata dictionary
-        toc_file: Path to the table of contents HTML file (entry point)
-        chapter_files: List of chapter HTML file paths
+        toc_file: Path to the reading-order table of contents page
+        chapter_files: List of chapter HTML file paths, in reading order
+        chapter_structure: Bookmap structure, parallel to chapter_files
         output_epub: Output EPUB file path
 
     Returns:
-        True if conversion successful, False otherwise
+        True if packaging succeeded, False otherwise
     """
-    log("📖 Converting to EPUB with Calibre...")
+    log("📖 Packaging EPUB 3...")
 
-    # Use TOC file as the main input
-    # Calibre will follow links to all chapter files
-    if not toc_file or not toc_file.exists():
-        log(f"❌ TOC HTML file not found")
+    style_dir = Path(STYLE_DIR)
+    if not (style_dir / "ebook.css").exists():
+        log(f"❌ Stylesheet not found: {style_dir / 'ebook.css'}")
         return False
 
-    # Resolve cover image path to absolute before changing directories
-    cover_path_absolute = None
-    if metadata.get('cover-image'):
-        cover_path = Path(metadata['cover-image'])
-        if not cover_path.is_absolute():
-            # Resolve relative to metadata file location
-            cover_path = Path(METADATA_FILE).parent / cover_path
-        # Make it absolute by resolving it
-        cover_path_absolute = cover_path.resolve()
+    epub_writer.set_logger(log)
 
-    # Change to the directory containing the HTML files so Calibre can find them
-    import os
-    original_dir = os.getcwd()
+    return epub_writer.write_epub(
+        metadata=metadata,
+        chapter_files=chapter_files,
+        chapter_structure=chapter_structure,
+        toc_file=toc_file,
+        style_dir=style_dir,
+        output_path=output_epub,
+        work_dir=Path(HTML_OUTPUT_DIR),
+    )
 
-    # Prepare paths based on whether we're changing directories
-    if epub_input_dir:
-        os.chdir(epub_input_dir)
-        log(f"   Working directory: {epub_input_dir}")
-        # Use just the filename when in the chapter directory
-        input_file = toc_file.name
-        # Make output path absolute relative to original directory
-        output_path = str(Path(original_dir) / output_epub)
-    else:
-        input_file = str(toc_file)
-        output_path = output_epub
-
-    log(f"   Using {toc_file.name} as entry point")
-    log(f"   Total chapters: {len(chapter_files)}")
-
-    # Build ebook-convert command
-    cmd = [
-        EBOOK_CONVERT_COMMAND,
-        input_file,
-        output_path
-    ]
-
-    # Add metadata arguments
-    if metadata.get('title'):
-        title = metadata['title']
-        if metadata.get('subtitle'):
-            title = f"{title}: {metadata['subtitle']}"
-        cmd.extend(["--title", title])
-        log(f"   Title: {title}")
-
-    if metadata.get('author'):
-        # Handle both single author string and list of authors
-        authors = metadata['author']
-        if isinstance(authors, list):
-            authors = ' & '.join(authors)
-        cmd.extend(["--authors", authors])
-        log(f"   Author(s): {authors}")
-
-    if metadata.get('language'):
-        cmd.extend(["--language", metadata['language']])
-
-    if metadata.get('publisher'):
-        cmd.extend(["--publisher", metadata['publisher']])
-
-    if metadata.get('description'):
-        cmd.extend(["--comments", metadata['description']])
-
-    if metadata.get('isbn'):
-        cmd.extend(["--isbn", metadata['isbn']])
-
-    if metadata.get('rights'):
-        cmd.extend(["--book-producer", metadata['rights']])
-
-    if metadata.get('series'):
-        cmd.extend(["--series", metadata['series']])
-        if metadata.get('series-number'):
-            cmd.extend(["--series-index", str(metadata['series-number'])])
-
-    # Add cover image if specified and exists
-    if cover_path_absolute:
-        if cover_path_absolute.exists():
-            cmd.extend(["--cover", str(cover_path_absolute)])
-            log(f"   Cover image: {cover_path_absolute.name}")
-        else:
-            log(f"⚠️  Warning: Cover image not found: {cover_path_absolute.name}")
-
-    # EPUB-specific options
-    cmd.extend([
-        "--no-default-epub-cover",  # Don't generate a default cover
-        "--preserve-cover-aspect-ratio",  # Keep cover proportions
-        "--flow-size", "0",  # Don't split HTML files by size
-        "--insert-blank-line",  # Improve readability
-        "--page-breaks-before", "/",  # No automatic page breaks
-        # Add CSS to preserve TOC classes (prevents Calibre from stripping them)
-        "--extra-css", "h1.part-title, h1.chapter-title, h1.appendix-title { display: block; } pre.codeblock, pre.codeblock code { font-family: monospace; white-space: pre-wrap; font-size: 0.85em; } code.ph.codeph { font-family: monospace; font-size: 0.85em; }",
-        # Generate EPUB TOC from our hierarchical structure
-        # Use contains() to match classes since h1 tags may have multiple space-separated classes
-        "--level1-toc", "//h:h1[contains(@class, 'part-title') or contains(@class, 'appendix-title')]",  # Parts and Appendices
-        "--level2-toc", "//h:h1[contains(@class, 'chapter-title')]",  # Regular chapters from actual content
-        "--level3-toc", "//h:h1[@class='no-match-xyz']",  # Prevent deeper nesting
-    ])
-
-    log(f"   Converting {toc_file.name} to EPUB...")
-
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-
-        if os.path.exists(output_path):
-            file_size = os.path.getsize(output_path) / 1024  # KB
-            log(f"✅ EPUB generated: {Path(output_path).name} ({file_size:.1f} KB)")
-            return True
-        else:
-            log(f"❌ EPUB file not created at: {output_path}")
-            return False
-
-    except subprocess.CalledProcessError as e:
-        log(f"❌ Error converting to EPUB:")
-        if e.stdout:
-            log(e.stdout)
-        if e.stderr:
-            log(e.stderr)
-        return False
-    finally:
-        if epub_input_dir:
-            os.chdir(original_dir)
 
 # ---------------------------------------------------------------------
 def main():
@@ -1407,20 +1341,18 @@ def main():
     if os.path.exists(LOG_FILE):
         os.remove(LOG_FILE)
 
-    log("🚀 Starting generate-epub.py (Calibre version)")
+    log("🚀 Starting generate-epub.py")
     log(f"📂 Reading DITA files from: {DITA_DIR}/")
 
     # Check prerequisites
     if not check_command(DITA_COMMAND, "Install from: https://www.dita-ot.org/download"):
         sys.exit(1)
 
-    # Check for Calibre's ebook-convert
-    if not os.path.exists(EBOOK_CONVERT_COMMAND):
-        log(f"❌ Error: Calibre's ebook-convert not found at: {EBOOK_CONVERT_COMMAND}")
-        log("   Install Calibre from: https://calibre-ebook.com/download")
+    style_css = Path(STYLE_DIR) / "ebook.css"
+    if not style_css.exists():
+        log(f"❌ Error: stylesheet not found: {style_css}")
         sys.exit(1)
-    else:
-        log(f"✓ ebook-convert found: {EBOOK_CONVERT_COMMAND}")
+    log(f"✓ Stylesheet: {style_css}")
 
     # Check if DITA directory exists
     dita_dir = Path(DITA_DIR)
@@ -1465,7 +1397,8 @@ def main():
     chapter_files, topic_to_chapter = merge_html_by_chapter(
         chapter_structure,
         html_output_dir,
-        chapter_output_dir
+        chapter_output_dir,
+        rename_map
     )
     if not chapter_files:
         log(f"❌ Failed to generate chapter HTML files")
@@ -1490,8 +1423,8 @@ def main():
     # Step 7: Create table of contents HTML with nested structure
     toc_file = create_toc_html(chapter_structure, chapter_files, chapter_output_dir, metadata, html_output_dir)
 
-    # Step 8: Convert to EPUB using Calibre
-    if not convert_to_epub(metadata, toc_file, chapter_files, output_epub, chapter_output_dir):
+    # Step 8: Package the EPUB 3
+    if not convert_to_epub(metadata, toc_file, chapter_files, chapter_structure, output_epub):
         log(f"❌ Failed to create EPUB")
         sys.exit(1)
 
@@ -1504,11 +1437,10 @@ def main():
     log("")
     log("📖 To view the EPUB:")
     log(f"   • macOS: open '{output_epub}'")
-    log(f"   • Linux: ebook-viewer '{output_epub}'")
-    log("   • Windows: Open with Calibre or Edge browser")
+    log(f"   • Kindle: check in Kindle Previewer 3 before uploading to KDP")
     log("")
-    log("✨ Chapter-based structure for better navigation!")
     log(f"   To customize metadata, edit: {METADATA_FILE}")
+    log(f"   To customize styling, edit: {STYLE_DIR}/ebook.css")
 
 if __name__ == "__main__":
     main()

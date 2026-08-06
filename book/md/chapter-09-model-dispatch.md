@@ -32,7 +32,8 @@ All `Fast*Model` classes share a common pattern established by `FastLlamaModel` 
 ```python
 class FastLlamaModel:
     @staticmethod
-    def from_pretrained(model_name, max_seq_length, load_in_4bit, ...):
+    def from_pretrained(
+        model_name, max_seq_length, load_in_4bit, ...):
         """Load model + tokenizer, apply all optimizations."""
         # 1. Load model via AutoModelForCausalLM
         # 2. Load tokenizer via load_correct_tokenizer()
@@ -41,7 +42,8 @@ class FastLlamaModel:
         return model, tokenizer
 
     @staticmethod
-    def get_peft_model(model, r, target_modules, lora_alpha, ...):
+    def get_peft_model(
+        model, r, target_modules, lora_alpha, ...):
         """Wrap model with LoRA adapters, then re-patch."""
         # 1. Apply LoRA via PEFT's get_peft_model()
         # 2. Re-patch model (PEFT wrapping removes some patches)

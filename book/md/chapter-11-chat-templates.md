@@ -49,9 +49,11 @@ chatml_template = \
         "{% if message['role'] == 'user' %}" \
             "{{'<|im_start|>user\n' + message['content'] + '<|im_end|>\n'}}" \
         "{% elif message['role'] == 'assistant' %}" \
-            "{{'<|im_start|>assistant\n' + message['content'] + '<|im_end|>\n'}}" \
+            "{{'<|im_start|>assistant\n' + " \
+            "message['content'] + '<|im_end|>\n'}}" \
         "{% else %}" \
-            "{{ '<|im_start|>system\n' + message['content'] + '<|im_end|>\n' }}" \
+            "{{ '<|im_start|>system\n' + " \
+            "message['content'] + '<|im_end|>\n' }}" \
         "{% endif %}" \
     "{% endfor %}" \
     "{% if add_generation_prompt %}" \
@@ -90,9 +92,12 @@ Each template family can optionally define a default system message:
 ```python
 DEFAULT_SYSTEM_MESSAGE["vicuna"] = \
     "A chat between a curious user and an artificial intelligence assistant. " \
-    "The assistant gives helpful, detailed, and polite answers to the user's questions."
-DEFAULT_SYSTEM_MESSAGE["llama-3"] = None  # No default system message
-DEFAULT_SYSTEM_MESSAGE["llama-3.1"] = ""  # Empty string (different from None)
+    "The assistant gives helpful, detailed, and "
+    "polite answers to the user's questions."
+# No default system message
+DEFAULT_SYSTEM_MESSAGE["llama-3"] = None
+# Empty string (different from None)
+DEFAULT_SYSTEM_MESSAGE["llama-3.1"] = ""
 ```
 
 ---
@@ -173,8 +178,10 @@ from unsloth.chat_templates import get_chat_template
 
 tokenizer = get_chat_template(
     tokenizer,
-    chat_template = "llama-3.1",           # Template name
-    mapping = {"role": "from", "content": "value"},  # Field mapping
+    # Template name
+    chat_template = "llama-3.1",
+    # Field mapping
+    mapping = {"role": "from", "content": "value"},
     system_message = "You are a helpful AI.",
 )
 ```

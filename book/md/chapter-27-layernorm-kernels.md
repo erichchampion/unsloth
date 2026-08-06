@@ -79,7 +79,8 @@ output = x_norm * weight
 
 ```python
 @triton.jit
-def rms_norm_kernel(x_ptr, weight_ptr, output_ptr, eps, d: tl.constexpr):
+def rms_norm_kernel(
+    x_ptr, weight_ptr, output_ptr, eps, d: tl.constexpr):
     row = tl.program_id(0)
     offsets = tl.arange(0, d)
 
@@ -151,10 +152,14 @@ The actual Triton kernel from `rms_layernorm.py` — annotated:
 ```python
 @triton.jit
 def _rms_layernorm_forward(
-    Y, Y_row_stride,     # Output tensor + stride
-    X, X_row_stride,     # Input tensor + stride
-    W, W_row_stride,     # Weight tensor + stride
-    r, r_row_stride,     # Inverse variance (saved for backward)
+    # Output tensor + stride
+    Y, Y_row_stride,
+    # Input tensor + stride
+    X, X_row_stride,
+    # Weight tensor + stride
+    W, W_row_stride,
+    # Inverse variance (saved for backward)
+    r, r_row_stride,
     n_cols: tl.constexpr,
     eps: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
@@ -171,15 +176,22 @@ def _rms_layernorm_forward(
     
     # Compute RMS: sqrt(mean(x²))
     row_var = tl.sum(X_row * X_row, axis=0) / n_cols
-    inv_var = tl.math.rsqrt(row_var + eps)   # 1/sqrt(var + eps)
-    tl.store(r + row_idx, inv_var)            # Save for backward pass
+    # 1/sqrt(var + eps)
+    inv_var = tl.math.rsqrt(row_var + eps)
+    # Save for backward pass
+    tl.store(r + row_idx, inv_var)
     
     # Normalize and scale
-    normed = X_row * inv_var                  # x̂ = x / RMS(x)
-    normed = normed.to(W_row.dtype)           # Match weight dtype
-    output = normed * W_row                   # y = x̂ * γ
+    # x̂ = x / RMS(x)
+    normed = X_row * inv_var
+    # Match weight dtype
+    normed = normed.to(W_row.dtype)
+    # y = x̂ * γ
+    output = normed * W_row
     
-    tl.store(Y + row_idx*Y_row_stride + col_offsets, output, mask=mask)
+    tl.store(
+        Y + row_idx*Y_row_stride + col_offsets, output,
+        mask=mask)
 ```
 
 ### Gemma Variant: The +1 Offset

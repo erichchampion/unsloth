@@ -80,9 +80,9 @@ for expert_id in range(num_experts):
 
 # Single grouped GEMM launch:
 all_outputs = grouped_gemm(
-    expert_weights,     # [N, d, h] — all expert weights stacked
-    grouped_inputs,     # Variable-size inputs, sorted by expert
-    group_sizes,        # [15, 3, 28, ..., 7] — tokens per expert
+    expert_weights, # [N, d, h] — all expert weights stacked
+    grouped_inputs, # Variable-size inputs, sorted by expert
+    group_sizes,    # [15, 3, 28, ..., 7] — tokens per expert
 )
 ```
 
@@ -109,7 +109,8 @@ autotune_config = triton.autotune(
     configs=[
         Config(BLOCK_M=32, BLOCK_N=64, BLOCK_K=32, num_warps=4),
         Config(BLOCK_M=64, BLOCK_N=64, BLOCK_K=32, num_warps=4),
-        Config(BLOCK_M=64, BLOCK_N=128, BLOCK_K=32, num_warps=8),
+        Config(
+            BLOCK_M=64, BLOCK_N=128, BLOCK_K=32, num_warps=8),
         # ... many more configs
     ],
     key=["M", "N", "K"],

@@ -46,9 +46,11 @@ Each `QuantType` maps to a tag that gets appended to the model name:
 ```python
 QUANT_TAG_MAP = {
     QuantType.BNB:     "bnb-4bit",          # → Llama-3.2-1B-Instruct-bnb-4bit
-    QuantType.UNSLOTH: "unsloth-bnb-4bit",  # → Llama-3.2-1B-Instruct-unsloth-bnb-4bit
+    # → Llama-3.2-1B-Instruct-unsloth-bnb-4bit
+    QuantType.UNSLOTH: "unsloth-bnb-4bit",
     QuantType.GGUF:    "GGUF",              # → Llama-3.2-1B-Instruct-GGUF
-    QuantType.NONE:    None,                # → Llama-3.2-1B-Instruct (no suffix)
+    # → Llama-3.2-1B-Instruct (no suffix)
+    QuantType.NONE:    None,
     QuantType.BF16:    "bf16",              # → DeepSeek-R1-bf16
 }
 ```
@@ -85,12 +87,18 @@ class ModelInfo:
 # registry/registry.py (lines 78-89)
 @dataclass
 class ModelMeta:
-    org: str                    # Original author (e.g., "meta-llama")
-    base_name: str              # Family name (e.g., "Llama")
-    model_version: str          # Version string (e.g., "3.2")
-    model_info_cls: type        # ModelInfo subclass for name construction
-    model_sizes: list[str]      # Available sizes ["1", "3", "8"]
-    instruct_tags: list[str]    # [None, "Instruct"]
+    # Original author (e.g., "meta-llama")
+    org: str
+    # Family name (e.g., "Llama")
+    base_name: str
+    # Version string (e.g., "3.2")
+    model_version: str
+    # ModelInfo subclass for name construction
+    model_info_cls: type
+    # Available sizes ["1", "3", "8"]
+    model_sizes: list[str]
+    # [None, "Instruct"]
+    instruct_tags: list[str]
     quant_types: list[QuantType] | dict[str, list[QuantType]]
     is_multimodal: bool = False
 ```
@@ -118,7 +126,9 @@ Here is how `_llama.py` declares the Llama 3.2 family:
 # registry/_llama.py (lines 38-60)
 class LlamaModelInfo(ModelInfo):
     @classmethod
-    def construct_model_name(cls, base_name, version, size, quant_type, instruct_tag):
+    def construct_model_name(
+        cls, base_name, version, size,
+        quant_type, instruct_tag):
         key = f"{base_name}-{version}-{size}B"  # → "Llama-3.2-1B"
         return super().construct_model_name(
             base_name, version, size, quant_type, instruct_tag, key
@@ -131,7 +141,9 @@ LlamaMeta_3_2_Instruct = ModelMeta(
     model_version = "3.2",
     model_sizes = ["1", "3"],
     model_info_cls = LlamaModelInfo,
-    quant_types = [QuantType.NONE, QuantType.BNB, QuantType.UNSLOTH, QuantType.GGUF],
+    quant_types = [
+        QuantType.NONE, QuantType.BNB,
+        QuantType.UNSLOTH, QuantType.GGUF],
 )
 ```
 
@@ -163,7 +175,8 @@ def _register_models(model_meta, include_original_model=False):
         for instruct_tag in model_meta.instruct_tags:
             for quant_type in _quant_types:
                 register_model(
-                    org="unsloth",  # All quantized models under unsloth org
+                    # All quantized models under unsloth org
+                    org="unsloth",
                     base_name=model_meta.base_name,
                     version=model_meta.model_version,
                     size=size,

@@ -36,7 +36,8 @@ Gemma multiplies the embedding output by `√hidden_size` before feeding it into
 ```python
 # Gemma embedding (differs from Llama)
 hidden_states = self.embed_tokens(input_ids)
-hidden_states = hidden_states * (self.config.hidden_size ** 0.5)  # Scaling!
+# Scaling!
+hidden_states = hidden_states * (self.config.hidden_size ** 0.5)
 ```
 
 This is a fixed scaling factor, not a learnable parameter. Without this scaling, the model produces garbage.
@@ -63,7 +64,8 @@ scores = (Q @ K.T) / sqrt(head_dim)
 
 # Gemma 2 soft-capped attention:
 scores = (Q @ K.T) / sqrt(head_dim)
-scores = tanh(scores / softcap_value) * softcap_value  # Soft-cap!
+# Soft-cap!
+scores = tanh(scores / softcap_value) * softcap_value
 ```
 
 ### Flash Attention Requirements
@@ -107,7 +109,8 @@ SDPA (Scaled Dot-Product Attention) produces incorrect results for Gemma 3. Unsl
 
 ```python
 # loader.py
-DISABLE_SDPA_MODEL_NAMES = "gemma3,"  # Note trailing comma to avoid matching "gemma3n"
+# Note trailing comma to avoid matching "gemma3n"
+DISABLE_SDPA_MODEL_NAMES = "gemma3,"
 ```
 
 The trailing comma is critical — without it, the pattern would also match `gemma3n` (a different model).

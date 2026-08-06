@@ -123,7 +123,8 @@ Unsloth's kernels are written in [OpenAI Triton](https://triton-lang.org/), a Py
     key=["n_elements"],
 )
 @triton.jit
-def example_kernel(x_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
+def example_kernel(
+    x_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0)
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements

@@ -11,7 +11,9 @@ from datetime import datetime
 # --- CONFIGURATION ---
 DITA_DIR = "dita"
 METADATA_FILE = "metadata.yaml"
-DITA_COMMAND = "dita"
+# publish-book.zsh runs non-interactively, so the toolkit location cannot
+# depend on an interactive shell's PATH.
+DITA_COMMAND = os.environ.get("DITA_COMMAND", "dita")
 LOG_FILE = "generate-pdf.log"
 
 # ---------------------------------------------------------------------
@@ -46,184 +48,6 @@ def load_metadata(metadata_file: str = METADATA_FILE) -> dict:
     except yaml.YAMLError as e:
         log(f"⚠️  Warning: Error parsing {metadata_file}: {e}")
         return {'title': 'Building AI Coding Assistants', 'language': 'en'}
-
-def create_pdf_customization(dita_dir: Path):
-    """Create a custom PDF configuration for better TOC styling."""
-    custom_dir = dita_dir / "pdf-custom"
-    custom_dir.mkdir(exist_ok=True)
-
-    cfg_dir = custom_dir / "cfg" / "fo" / "attrs"
-    cfg_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create custom TOC and image attribute configuration
-    toc_attrs = """<?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-                xmlns:fo="http://www.w3.org/1999/XSL/Format"
-                version="2.0">
-
-  <!-- TOC indent for nested levels -->
-  <xsl:attribute-set name="__toc__indent">
-    <xsl:attribute name="start-indent">
-      <xsl:variable name="level" select="count(ancestor-or-self::*[contains(@class, ' topic/topic ')])"/>
-      <xsl:value-of select="concat($level * 12, 'pt')"/>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- TOC entry styling by level -->
-  <xsl:attribute-set name="__toc__topic__content">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-    <xsl:attribute name="font-weight">
-      <xsl:variable name="level" select="count(ancestor-or-self::*[contains(@class, ' topic/topic ')])"/>
-      <xsl:choose>
-        <xsl:when test="$level = 1">bold</xsl:when>
-        <xsl:otherwise>normal</xsl:otherwise>
-      </xsl:choose>
-    </xsl:attribute>
-    <xsl:attribute name="font-size">
-      <xsl:variable name="level" select="count(ancestor-or-self::*[contains(@class, ' topic/topic ')])"/>
-      <xsl:choose>
-        <xsl:when test="$level = 1">14pt</xsl:when>
-        <xsl:when test="$level = 2">12pt</xsl:when>
-        <xsl:otherwise>10pt</xsl:otherwise>
-      </xsl:choose>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Global font family settings for consistency -->
-  <xsl:attribute-set name="common.border__top">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="common.border__bottom">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Body text -->
-  <xsl:attribute-set name="body__toplevel">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="topic">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Title and headings -->
-  <xsl:attribute-set name="topic.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="topic.topic.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="section.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Paragraphs and text -->
-  <xsl:attribute-set name="p">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Lists -->
-  <xsl:attribute-set name="ul">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="ol">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Tables -->
-  <xsl:attribute-set name="table">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="table.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Standalone figure images: full size, max 50% of page width -->
-  <xsl:attribute-set name="image" use-attribute-sets="image__block">
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="image__block">
-    <xsl:attribute name="content-width">
-      <xsl:text>scale-to-fit</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="content-height">
-      <xsl:text>100%</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="width">
-      <xsl:text>100%</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="max-width">
-      <xsl:text>5in</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="scaling">
-      <xsl:text>uniform</xsl:text>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Inline icon images: height limited to line height, preserve aspect ratio -->
-  <xsl:attribute-set name="image__inline">
-    <xsl:attribute name="content-height">
-      <xsl:text>1em</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="content-width">
-      <xsl:text>scale-to-fit</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="scaling">
-      <xsl:text>uniform</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="vertical-align">
-      <xsl:text>middle</xsl:text>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Code block syntax highlighting -->
-  <xsl:attribute-set name="codeblock">
-    <xsl:attribute name="font-family">monospace</xsl:attribute>
-    <xsl:attribute name="font-size">8pt</xsl:attribute>
-    <xsl:attribute name="background-color">#f5f5f5</xsl:attribute>
-    <xsl:attribute name="padding">6pt</xsl:attribute>
-    <xsl:attribute name="border">0.5pt solid #cccccc</xsl:attribute>
-    <xsl:attribute name="keep-together.within-page">auto</xsl:attribute>
-    <xsl:attribute name="white-space-treatment">preserve</xsl:attribute>
-    <xsl:attribute name="linefeed-treatment">preserve</xsl:attribute>
-    <xsl:attribute name="white-space-collapse">false</xsl:attribute>
-    <xsl:attribute name="wrap-option">wrap</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Inline code -->
-  <xsl:attribute-set name="codeph">
-    <xsl:attribute name="font-family">monospace</xsl:attribute>
-    <xsl:attribute name="font-size">0.9em</xsl:attribute>
-    <xsl:attribute name="background-color">#f5f5f5</xsl:attribute>
-    <xsl:attribute name="padding-left">2pt</xsl:attribute>
-    <xsl:attribute name="padding-right">2pt</xsl:attribute>
-  </xsl:attribute-set>
-
-</xsl:stylesheet>
-"""
-
-    toc_attrs_file = cfg_dir / "toc-attr.xsl"
-    with open(toc_attrs_file, "w", encoding="utf-8") as f:
-        f.write(toc_attrs)
-
-    # Create plugin configuration
-    plugin_xml = """<?xml version="1.0" encoding="UTF-8"?>
-<plugin id="com.custom.pdf">
-  <feature extension="dita.conductor.xslt.param" file="cfg/fo/attrs/toc-attr.xsl"/>
-</plugin>
-"""
-
-    plugin_file = custom_dir / "plugin.xml"
-    with open(plugin_file, "w", encoding="utf-8") as f:
-        f.write(plugin_xml)
-
-    log(f"✅ Created PDF customization in {custom_dir}")
-    return custom_dir
 
 def run_dita_ot(ditamap_path: Path, output_dir: Path, output_pdf: str, dita_dir: Path, metadata: dict = None):
     """Run DITA-OT to generate PDF with metadata."""
@@ -264,8 +88,14 @@ def run_dita_ot(ditamap_path: Path, output_dir: Path, output_pdf: str, dita_dir:
         log(f"❌ Error checking installed plugins: {e}")
         sys.exit(1)
 
-    # Create custom PDF configuration
-    custom_dir = create_pdf_customization(dita_dir)
+    # There used to be a create_pdf_customization() call here. It wrote a
+    # `com.custom.pdf` plugin into dita/pdf-custom/ on every run — 8pt
+    # grey-boxed codeblock attribute sets and a TOC override — but the plugin
+    # was never installed and never passed to `dita`, so none of it reached the
+    # PDF. It also declared the extension point `dita.conductor.xslt.param`,
+    # which is not where attribute-set overrides go (`dita.xsl.xslfo` is), so
+    # installing it would not have worked either. PDF code styling comes from
+    # pdf-theme/cfg/fo/attrs/pr-domain-attr.xsl.
 
     # Run DITA-OT
     output_dir.mkdir(parents=True, exist_ok=True)

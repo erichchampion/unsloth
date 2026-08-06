@@ -32,14 +32,18 @@ In a standard LoRA implementation, the forward pass for a single linear layer re
 # Standard LoRA forward (3 separate kernel launches)
 
 # Launch 1: Dequantize 4-bit weights to float16
-W_16bit = dequantize_nf4(W_4bit, quant_state)    # Read W_4bit, write W_16bit
+# Read W_4bit, write W_16bit
+W_16bit = dequantize_nf4(W_4bit, quant_state)
 
 # Launch 2: Matrix multiply
-y = W_16bit @ x                                    # Read W_16bit + x, write y
+# Read W_16bit + x, write y
+y = W_16bit @ x
 
 # Launch 3: LoRA correction
-lora_out = (scaling * B) @ (A @ x)                 # Read A, B, x, write lora_out
-y = y + lora_out                                    # Read y + lora_out, write y
+# Read A, B, x, write lora_out
+lora_out = (scaling * B) @ (A @ x)
+# Read y + lora_out, write y
+y = y + lora_out
 ```
 
 Each launch reads from and writes to global GPU memory, creating three complete memory round-trips.
@@ -161,10 +165,13 @@ Weights are quantized in blocks of 64 values, each sharing a single FP16 scale f
 # Dequantization (simplified):
 block_size = 64
 for block_idx in range(num_blocks):
-    scale = scales[block_idx]                    # FP16 scale factor
+    # FP16 scale factor
+    scale = scales[block_idx]
     for i in range(block_size):
-        nf4_index = packed_weights[block_idx, i]  # 4-bit index (0-15)
-        weight_fp16 = NF4_TABLE[nf4_index] * scale  # Dequantized value
+        # 4-bit index (0-15)
+        nf4_index = packed_weights[block_idx, i]
+        # Dequantized value
+        weight_fp16 = NF4_TABLE[nf4_index] * scale
 ```
 
 The kernel also handles the double quantization variant (`bnb_4bit_use_double_quant=True`), where the block scale factors themselves are quantized to 8-bit, saving an additional ~0.4 bits per weight.

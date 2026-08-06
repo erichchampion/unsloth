@@ -153,7 +153,8 @@ Kaggle has limited disk space. When pushing to hub, Unsloth moves the save direc
 
 ```python
 if IS_KAGGLE_ENVIRONMENT:
-    new_save_directory = os.path.join(KAGGLE_TMP, new_save_directory)
+    new_save_directory = os.path.join(
+        KAGGLE_TMP, new_save_directory)
     logger.warning(f"To save memory, we shall move to {new_save_directory}")
 ```
 

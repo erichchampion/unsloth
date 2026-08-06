@@ -85,8 +85,10 @@ def _rope_embedding(
     Each program processes one (row, head_group) pair.
     """
     ROPE_GROUP_SIZE = 4
-    row_position  = tl.program_id(0)   # Which (batch, seq) position
-    group_head    = tl.program_id(1)   # Which group of 4 heads
+    # Which (batch, seq) position
+    row_position  = tl.program_id(0)
+    # Which group of 4 heads
+    group_head    = tl.program_id(1)
     half_head_dim = head_dim // 2
     
     col_offsets = tl.arange(0, BLOCK_SIZE)
@@ -107,14 +109,19 @@ def _rope_embedding(
     
     for k in range(head_start, head_end):
         # Load the two halves of this head's Q vector
-        Q1 = tl.load(Q + row_position * Q_row_stride + k * head_dim + col_offsets,
+        Q1 = tl.load(Q + row_position * Q_row_stride
+                     + k * head_dim + col_offsets,
                      mask=mask, other=0)
-        Q2 = tl.load(Q + row_position * Q_row_stride + k * head_dim + col_offsets
+        Q2 = tl.load(Q + row_position * Q_row_stride
+                     + k * head_dim + col_offsets
                      + half_head_dim, mask=mask, other=0)
         
         # Apply rotation: [q0', q1'] = [q0*cos - q1*sin, q1*cos + q0*sin]
-        tl.store(Q + ... + col_offsets,                Q1*cos1 - Q2*sin1, mask=mask)
-        tl.store(Q + ... + col_offsets + half_head_dim, Q2*cos1 + Q1*sin1, mask=mask)
+        tl.store(
+            Q + ... + col_offsets, Q1*cos1 - Q2*sin1, mask=mask)
+        tl.store(
+            Q + ... + col_offsets + half_head_dim,
+            Q2*cos1 + Q1*sin1, mask=mask)
 ```
 
 Key design decisions:
