@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin id="pdf-theme">
+  <require plugin="org.dita.pdf2" />
+  <transtype extends="pdf" name="pdf-theme" />
+  <feature extension="ant.import" file="integrator.xml" />
+  <feature extension="dita.transtype.print" value="pdf-theme" />
+</plugin>

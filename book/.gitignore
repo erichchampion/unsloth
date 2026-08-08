@@ -10,15 +10,11 @@ dita/
 !8.5x11.pdf
 *.log
 
-# DITA-OT plugins (installed locally)
-pdf-theme/*
-!pdf-theme/cfg/
-pdf-theme/cfg/*
-!pdf-theme/cfg/common/
-pdf-theme/cfg/common/*
-!pdf-theme/cfg/common/vars/
-pdf-theme/cfg/common/vars/*
-!pdf-theme/cfg/common/vars/en.xml
+# DITA-OT plugins. pdf-theme is this book's own customisation of the PDF
+# output and is tracked here: it is the only copy, and install-pdf-theme.sh
+# builds the installed plugin from it. Only en.xml used to be kept, which left
+# the layout and typography outside version control. The syntax-highlighting
+# plugin comes from elsewhere and is not ours to keep.
 pdf-theme-syntax-highlight/
 pdf-theme-syntax-highlight.zip
 
