@@ -581,6 +581,77 @@ def convert_list_item_content(li_element) -> list:
 
     return result
 
+# Rough advance per character, as a fraction of the font size. Code cells are
+# set in Courier New, which advances 0.6em for every glyph; prose is Helvetica,
+# where 0.5em is a fair average across mixed-case text.
+_MONO_ADVANCE = 0.6
+_PROSE_ADVANCE = 0.5
+
+# Cell padding, in em of the table font. A flat per-column cost, so it belongs
+# in the weight: leave it out and every column is allocated its text width and
+# then has padding taken back out of it.
+_CELL_PADDING = 1.5
+
+
+def _cell_widths(cell):
+    """(longest unbreakable run, whole-cell width) for one cell, in em.
+
+    The two numbers answer different questions. A cell wraps at spaces, so its
+    natural width is only what it would like; the longest run without a space
+    is what it *needs*, because nothing can break an identifier like
+    OPENCODE_PROVIDER_ANTHROPIC_API_KEY and a column narrower than that one run
+    is a column the text runs out of.
+    """
+    longest = natural = 0.0
+
+    for text in cell.strings:
+        mono = any(parent.name == "code" for parent in text.parents)
+        advance = _MONO_ADVANCE if mono else _PROSE_ADVANCE
+        natural += len(text) * advance
+        for run in str(text).split():
+            longest = max(longest, len(run) * advance)
+
+    return longest, natural
+
+
+def estimate_colwidths(rows, num_cols):
+    """Proportional column weights for a table's colspecs, or None.
+
+    Without these every column takes an equal share whatever it holds, which is
+    how a column of environment-variable names came to need 210pt of a 154pt
+    third of the table and ran off the page.
+
+    A column is weighted by the longest run it has to fit, plus cell padding,
+    with a floor of a quarter of its natural width so a column of prose is not
+    squeezed to nothing next to one holding a long identifier. The floor is
+    deliberately low: prose wraps and an identifier does not, so where the two
+    compete the identifier has to win. Cells that span columns are skipped,
+    since their width belongs to no single column.
+    """
+    longest = [0.0] * num_cols
+    natural = [0.0] * num_cols
+
+    for row in rows:
+        cells = row.find_all(["td", "th"], recursive=False)
+        for index, cell in enumerate(cells):
+            if index >= num_cols or cell.get("colspan"):
+                continue
+            run, whole = _cell_widths(cell)
+            longest[index] = max(longest[index], run)
+            natural[index] = max(natural[index], whole)
+
+    weights = [max(longest[i], natural[i] / 4) + _CELL_PADDING
+               for i in range(num_cols)]
+    total = sum(weights)
+    if not total:
+        return None
+
+    # Scaled to a thousand rather than to the smallest column: rounding to
+    # small integers costs enough precision to push a column a point short of
+    # the string it exists to hold.
+    return [max(1, round(1000 * w / total)) for w in weights]
+
+
 def convert_table_to_dita(table_element) -> str:
     """Convert HTML table to DITA table with formatting preserved."""
     dita_table = ['    <table>']
@@ -602,9 +673,20 @@ def convert_table_to_dita(table_element) -> str:
 
     dita_table.append(f'      <tgroup cols="{num_cols}">')
 
-    # Add column specifications
+    # Add column specifications, sized to what each column has to hold.
+    all_rows = []
+    for section in (thead, tbody):
+        if section:
+            all_rows.extend(section.find_all("tr"))
+    widths = estimate_colwidths(all_rows, num_cols)
+
     for i in range(num_cols):
-        dita_table.append('        <colspec colname="c{}" colnum="{}"/>'.format(i+1, i+1))
+        if widths:
+            dita_table.append(
+                '        <colspec colname="c{}" colnum="{}" colwidth="{}*"/>'.format(
+                    i + 1, i + 1, widths[i]))
+        else:
+            dita_table.append('        <colspec colname="c{}" colnum="{}"/>'.format(i+1, i+1))
 
     if thead:
         dita_table.append('        <thead>')
