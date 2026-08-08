@@ -109,7 +109,7 @@ Concatenates multiple short sequences into one long sequence with attention mask
 
 ```
 Before packing:  [A A A PAD PAD] [B B B B PAD] [C C PAD PAD PAD]
-After packing:   [A A A B B B B] [C C PAD PAD PAD PAD PAD PAD]  ← fewer sequences
+After packing:   [A A A B B B B] [C C PAD PAD PAD PAD PAD PAD]  ← fewer seqs
 ```
 
 ### Padding-Free

@@ -76,9 +76,12 @@ QLoRA takes LoRA further by quantizing the frozen base weights **W** to 4-bit NF
 
 ```
 Memory comparison (7B model):
-  Full FP16:     14 GB (weights) + 14 GB (gradients) + 28 GB (Adam) = 56 GB
-  LoRA FP16:     14 GB (weights, frozen) + ~0.1 GB (adapters) + ~0.2 GB (Adam) = 14.3 GB
-  QLoRA 4-bit:   3.5 GB (weights, 4-bit) + ~0.1 GB (adapters) + ~0.2 GB (Adam) = 3.8 GB
+  Full FP16:    14 GB weights + 14 GB grads + 28 GB Adam
+                  = 56 GB
+  LoRA FP16:    14 GB weights (frozen) + ~0.1 GB adapters
+                  + ~0.2 GB Adam = 14.3 GB
+  QLoRA 4-bit:  3.5 GB weights (4-bit) + ~0.1 GB adapters
+                  + ~0.2 GB Adam = 3.8 GB
 ```
 
 In Unsloth, QLoRA is the default mode (`load_in_4bit=True`). The base weights are quantized using `BitsAndBytesConfig`:
@@ -152,12 +155,16 @@ Standard LoRA requires three separate operations: dequantize W, compute Wx, comp
 
 ```python
 # Standard (3 kernel launches):
-W_fp16 = dequantize(W_4bit)     # Kernel 1
-y = W_fp16 @ x                   # Kernel 2
-y += (alpha/r) * (B @ (A @ x))   # Kernel 3
+# Kernel 1
+W_fp16 = dequantize(W_4bit)
+# Kernel 2
+y = W_fp16 @ x
+# Kernel 3
+y += (alpha/r) * (B @ (A @ x))
 
 # Unsloth (1 kernel launch):
-y = fast_lora_forward(W_4bit, A, B, x, alpha, r)  # Single fused kernel
+# Single fused kernel
+y = fast_lora_forward(W_4bit, A, B, x, alpha, r)
 ```
 
 ### Post-PEFT Re-Patching
@@ -166,8 +173,10 @@ PEFT's `get_peft_model()` wraps the model in a `PeftModel`, which can undo some 
 
 ```python
 # Internal flow:
-model = peft.get_peft_model(model, lora_config)  # PEFT wrapping
-FastLlamaModel.patch_peft_model(model)            # Re-apply Unsloth patches
+# PEFT wrapping
+model = peft.get_peft_model(model, lora_config)
+# Re-apply Unsloth patches
+FastLlamaModel.patch_peft_model(model)
 ```
 
 ---

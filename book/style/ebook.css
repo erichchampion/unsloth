@@ -1,0 +1,414 @@
+/* ebook.css — the sole stylesheet shipped inside the EPUB.
+ *
+ * Written against the Amazon Kindle Publishing Guidelines, Appendix B
+ * (attributes and tags supported by Enhanced Typesetting). Since revision
+ * 2025.1 Enhanced Typesetting applies to every conversion format, so its
+ * constraints govern regardless of what KDP converts the upload into.
+ *
+ * Three constraints shape everything below:
+ *
+ *   1. Shorthands are not in the supported-attributes table. `border-left`,
+ *      `background`, `font` and `list-style` are absent while their longhands
+ *      (`border-left-color`, `background-color`, `font-family`, …) are present.
+ *      Every declaration here is longhand.
+ *
+ *   2. `white-space` is supported only as `nowrap` or `normal` — neither `pre`
+ *      nor `pre-wrap`. Preformatted whitespace therefore cannot be relied on,
+ *      which is why epub_writer.py emits one <div class="cl"> per logical line
+ *      and hard-spaces both the alignment runs inside a line and the indent
+ *      that opens it. Nothing here declares `white-space`. The two runs use
+ *      different characters — U+00A0 inside, U+2007 to open — because Kindle
+ *      draws a leading no-break space at roughly 0.4 of a character while
+ *      leaving an interior one alone.
+ *
+ *   3. `overflow` is supported only as `hidden`, and `word-wrap` is ignored
+ *      outright. There is no scrollable region and no soft-wrap override:
+ *      `word-break` is the only wrapping lever available.
+ *
+ * CSS custom properties are likewise absent from the supported table, so every
+ * colour below is a literal.
+ */
+
+/* ---------------------------------------------------------------- fonts -- */
+
+/* Noto Sans Mono, SIL Open Font License 1.1 (see fonts/OFL.txt).
+ * Static instances cut from the variable font at wght 400 and 700, then
+ * subsetted at build time to the glyphs the book actually uses.
+ *
+ * Regular and bold are both embedded on purpose. A reader asked for a weight
+ * it has no face for may fall back to its own default family rather than
+ * synthesising, which would break monospace alignment mid-line. There is no
+ * italic face, so nothing here asks for one. */
+
+@font-face {
+  font-family: "BookMono";
+  font-style: normal;
+  font-weight: normal;
+  src: url("../fonts/NotoSansMono-Regular.ttf");
+}
+
+@font-face {
+  font-family: "BookMono";
+  font-style: normal;
+  font-weight: bold;
+  src: url("../fonts/NotoSansMono-Bold.ttf");
+}
+
+/* ----------------------------------------------------------- body text -- */
+
+/* Body text deliberately carries no font-family, no colour and no left/right
+ * margin: the guidelines ask that readers keep control of all three, and KDP
+ * normalises majority font-size to 1em during upload regardless. */
+
+body {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 0.75em;
+  text-indent: 0;
+  text-align: justify;
+}
+
+h1 {
+  font-size: 1.5em;
+  font-weight: bold;
+  line-height: 1.2;
+  margin-top: 0;
+  margin-bottom: 0.8em;
+  text-align: left;
+  page-break-before: always;
+}
+
+/* No `page-break-after: avoid` on headings: the supported values for the
+ * page-break properties are left, right and always, and `page-break-inside` is
+ * ignored outright, so keep-with-next cannot be expressed here. */
+
+h2 {
+  font-size: 1.2em;
+  font-weight: bold;
+  line-height: 1.25;
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  text-align: left;
+}
+
+h3 {
+  font-size: 1.05em;
+  font-weight: bold;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+  text-align: left;
+}
+
+ul, ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.8em;
+  padding-left: 1.4em;
+}
+
+li {
+  margin-bottom: 0.3em;
+  text-align: left;
+}
+
+/* Block quotes and the chapter epigraphs (.lq) use percentage margins, as the
+ * guidelines require for any section that indents away from body text. */
+blockquote, .lq {
+  margin-left: 6%;
+  margin-right: 6%;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------- code blocks -- */
+
+/* No background-color. On e-ink a light fill dithers into a halftone that
+ * costs more legibility at 0.8em than the delimiting is worth; a left rule
+ * reads cleanly at any size and survives the reader's dark theme. */
+
+div.codeblock {
+  font-family: "BookMono", monospace;
+  font-size: 0.8em;
+  line-height: 1.35;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  padding-top: 0.4em;
+  padding-bottom: 0.4em;
+  padding-left: 0.7em;
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: #999999;
+  text-align: left;
+  hyphens: none;
+}
+
+/* Deliberately NOT `word-break: break-all`.
+ *
+ * Kindle Previewer showed it breaking mid-word even when the whole word would
+ * have fitted on the next line — "…correctness and styl" / "e.", — where a
+ * browser only breaks inside a word that cannot fit a line on its own. Normal
+ * breaking keeps words intact.
+ *
+ * The cost is that a token longer than one line cannot break at all, and
+ * `overflow` is supported only as `hidden`, so it is clipped rather than
+ * wrapped. generate-dita.py reports any such token so it can be shortened at
+ * source; there are two in these books today. */
+div.codeblock {
+  word-break: normal;
+}
+
+div.codeblock code {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* One logical source line per block box.
+ *
+ * The hanging indent is the whole point: a line that fits sits flush against
+ * the rule, and a line too long to fit wraps to a visibly indented
+ * continuation, the way an editor's soft wrap reads. This only works per-line
+ * — `text-indent` applies to the first formatted line of a block, so applying
+ * it to the container as a whole would indent every hard line break instead of
+ * every wrap. Hence one block per line.
+ *
+ * These are <div>s rather than <span display:block> because Kindle Previewer
+ * ignored both `padding-left` and `text-indent` on the spans: a wrapped line
+ * came back flush with the line above it, with no continuation marker at all.
+ * A real block element is the standard way to get box properties honoured.
+ * That is also why the container is a <div> and not a <pre> — <pre> takes
+ * phrasing content only, so it cannot hold block children. The monospace
+ * fallback that <pre> used to provide now comes from the <code> inside each
+ * line, which KDP §11.3.8 lists alongside <pre> as monospace-rendered.
+ *
+ * Nothing here indents a line by its leading whitespace, and nothing should
+ * try. Kindle Previewer resolves a length on one of these boxes against a font
+ * size about 1.45 times smaller than the size it draws the text at, so no em
+ * value is a character wide, and `ch` is dropped outright. The indent is
+ * hard-spaced in the markup instead, with the figure space U+2007 — a digit
+ * width, and so a cell in a monospace face. See
+ * epub_writer.transform_codeblocks() for the measurements.
+ *
+ * A blank source line carries a figure space of its own, for the same reason:
+ * Kindle discards an empty box along with any height declared on it, and a
+ * height in em would be measured against the wrong font size. One character
+ * makes one line box of the `line-height` above. */
+div.codeblock .cl {
+  display: block;
+  padding-left: 2em;
+  text-indent: -2em;
+}
+
+/* ASCII diagrams, marked `outputclass="diagram"` by generate-dita.py.
+ *
+ * A code sample that wraps is still readable — that is what the hanging indent
+ * above is for. A diagram that wraps is destroyed, because all of its meaning
+ * is in the column alignment. Since it is read as a picture rather than copied
+ * as source, it can afford a smaller size, and a smaller size is the only way
+ * to keep a wide drawing on one line.
+ *
+ * Noto Sans Mono advances 0.6em per character, so at 0.65em roughly 80
+ * characters fit across a 6" Kindle at the default reading size, against 65 at
+ * the 0.8em used for code. That covers every diagram in both books. Confirm
+ * the exact figure in Kindle Previewer — it depends on the page margins the
+ * device applies, which are not something CSS can read. */
+
+div.codeblock.diagram {
+  font-size: 0.65em;
+  line-height: 1.2;
+}
+
+/* Both zeroed so a diagram line starts at column 0, since its indent is the
+ * figure spaces that open it and any offset here would add to them. */
+div.codeblock.diagram .cl {
+  padding-left: 0;
+  text-indent: 0;        /* a wrapped diagram is already lost; don't mark it */
+}
+
+/* Inline code. No background or border — at inline scale both cost more in
+ * ragged line boxes than they return.
+ *
+ * `word-break: normal` for the same reason as the code blocks: with break-all
+ * Previewer split `Instance.project` across a line as "Instanc" / "e.project"
+ * in the middle of running prose. An identifier that will not fit now pushes
+ * to the next line instead, which loosens justification but keeps the name
+ * readable. */
+code.codeph {
+  font-family: "BookMono", monospace;
+  font-size: 0.85em;
+  word-break: normal;
+}
+
+/* --------------------------------------------------- syntax highlighting -- */
+
+/* Ported from the Prism Solarized theme that DITA-OT emits, but re-picked for
+ * e-ink first. Solarized's base00 body text (#657b83) is a mid-grey that reads
+ * as washed out on a greyscale screen, so the default here is the reader's own
+ * text colour and only the token classes take a hue.
+ *
+ * On a colour screen these read as a normal syntax theme. On e-ink they
+ * flatten to nearly the same grey, which is why weight and lightness carry the
+ * distinction independently: keywords are bold, comments are the one token
+ * deliberately lighter than its surroundings. The greys sit inside the #666 to
+ * #999 band the guidelines recommend for imposed grey text. */
+
+.token.comment,
+.token.block-comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6a6a6a;
+}
+
+.token.punctuation,
+.token.operator,
+.token.entity,
+.token.url {
+  color: #666666;
+}
+
+.token.keyword,
+.token.builtin,
+.token.selector,
+.token.atrule,
+.token.important,
+.token.decorator,
+.token.annotation {
+  color: #005a9c;
+  font-weight: bold;
+}
+
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex,
+.token.variable,
+.token.template-string,
+.token.triple-quoted-string,
+.token.string-interpolation {
+  color: #0a6b45;
+}
+
+.token.number,
+.token.boolean,
+.token.constant {
+  color: #8a4600;
+}
+
+.token.function,
+.token.function-name,
+.token.class-name,
+.token.property,
+.token.symbol,
+.token.key,
+.token.parameter,
+.token.tag,
+.token.attr-name,
+.token.namespace {
+  color: #6b3fa0;
+}
+
+.token.bold {
+  font-weight: bold;
+}
+
+.token.deleted {
+  color: #8a4600;
+}
+
+.token.inserted {
+  color: #0a6b45;
+}
+
+/* --------------------------------------------------------------- tables -- */
+
+table {
+  border-collapse: collapse;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  width: 100%;
+}
+
+th, td {
+  padding-top: 0.3em;
+  padding-bottom: 0.3em;
+  padding-left: 0.4em;
+  padding-right: 0.4em;
+  text-align: left;
+  vertical-align: top;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: #cccccc;
+}
+
+th {
+  font-weight: bold;
+}
+
+/* ------------------------------------------------------ front and navs -- */
+
+/* Percentage margins resolve against the containing block's width, so vertical
+ * space on the title page is set in em. */
+.titlepage {
+  text-align: center;
+  padding-top: 6em;
+}
+
+.titlepage .booktitle {
+  font-size: 2em;
+  font-weight: bold;
+  margin-bottom: 0.5em;
+}
+
+.titlepage .booksubtitle {
+  font-size: 1.2em;
+  font-style: italic;
+  margin-bottom: 2em;
+}
+
+nav ol {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+nav ol ol {
+  padding-left: 1.2em;
+}
+
+nav li {
+  margin-bottom: 0.4em;
+}
+
+/* The reading-order TOC page written by create_toc_html(). Its own inline
+ * <style> is stripped during packaging so that ebook.css is the only
+ * stylesheet in the container; these rules replace it. */
+
+/* These two are <h1> elements inside <li>, so they inherit the chapter-opening
+ * `page-break-before: always` above and would otherwise split the TOC across
+ * one page per part. Only latent while the bookmaps are flat. */
+
+.toc-part-heading {
+  font-weight: bold;
+  font-size: 1.15em;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+  page-break-before: auto;
+}
+
+.toc-appendix-heading {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+  page-break-before: auto;
+}
+
+.chapter-link {
+  font-size: 1em;
+}

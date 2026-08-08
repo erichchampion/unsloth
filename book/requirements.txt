@@ -1,4 +1,10 @@
+# Everything the generators import. publish-book.zsh installs from this file
+# rather than from an inline list of its own, so the two cannot drift apart.
 beautifulsoup4>=4.12.0
 markdown>=3.5.0
 requests>=2.31.0
 pyyaml>=6.0
+
+# Subsets the embedded monospace faces to the glyphs the book uses. Without it
+# epub_writer embeds each face whole, which is correct but adds around 800 KB.
+fonttools>=4.50.0

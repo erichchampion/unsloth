@@ -61,8 +61,8 @@ This is the heart of the project — the importable Python package that provides
 
 ```
 unsloth/
-├── __init__.py              # Import-time patching, dependency checks (331 lines)
-├── import_fixes.py          # 25+ monkey patches for transformers, trl, peft (65K)
+├── __init__.py              # Import-time patching, dep checks (331 lines)
+├── import_fixes.py          # 25+ monkey patches: transformers, trl, peft (65K)
 ├── device_type.py           # GPU/CPU detection and capability flags
 ├── models/                  # Model-specific Fast* classes + loader (22 files)
 ├── kernels/                 # Custom Triton kernels (11 files + moe/ subdir)
@@ -231,11 +231,16 @@ At nearly 1,200 lines, this is one of the most complex `pyproject.toml` files yo
 The key structural sections are:
 
 ```toml
-[build-system]          # setuptools 80.9.0 + setuptools-scm
-[project]               # Package metadata, Python >=3.9,<3.15
-[project.scripts]       # CLI entry point: unsloth = "unsloth_cli:app"
-[project.optional-dependencies]   # The massive extras matrix
-[tool.setuptools]       # Package data globs for Studio frontend files
+# setuptools 80.9.0 + setuptools-scm
+[build-system]
+# Package metadata, Python >=3.9,<3.15
+[project]
+# CLI entry point: unsloth = "unsloth_cli:app"
+[project.scripts]
+# The massive extras matrix
+[project.optional-dependencies]
+# Package data globs for Studio frontend files
+[tool.setuptools]
 ```
 
 ### `build.sh`

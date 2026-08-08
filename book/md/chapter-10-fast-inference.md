@@ -33,8 +33,10 @@ Fast inference is activated via a single parameter in `from_pretrained()`:
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Llama-3.2-1B-Instruct",
     fast_inference = True,
-    gpu_memory_utilization = 0.5,    # Fraction of GPU VRAM for vLLM
-    float8_kv_cache = False,         # Use FP8 for KV cache
+    # Fraction of GPU VRAM for vLLM
+    gpu_memory_utilization = 0.5,
+    # Use FP8 for KV cache
+    float8_kv_cache = False,
 )
 ```
 
@@ -117,13 +119,15 @@ Once a model is loaded with `fast_inference=True`, generation uses a different c
 
 ```python
 # Standard generation (without fast_inference)
-inputs = tokenizer("Hello, how are you?", return_tensors="pt").to("cuda")
+inputs = tokenizer(
+    "Hello, how are you?", return_tensors="pt").to("cuda")
 outputs = model.generate(**inputs, max_new_tokens=128)
 print(tokenizer.decode(outputs[0]))
 
 # With fast_inference, use the chat template + generate pattern
 messages = [{"role": "user", "content": "What is machine learning?"}]
-input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+input_text = tokenizer.apply_chat_template(
+    messages, add_generation_prompt=True, tokenize=False)
 outputs = model.fast_generate(
     [input_text],
     max_new_tokens=256,

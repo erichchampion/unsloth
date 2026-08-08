@@ -132,7 +132,9 @@ Without this caching, every forward pass would trigger a GPU-to-GPU transfer of 
 DEVICE_COUNT = torch.cuda.device_count()
 
 if DEVICE_COUNT > 1:
-    logger.info(f"Unsloth: Detected {DEVICE_COUNT} GPUs — using distributed mode")
+    logger.info(
+        f"Unsloth: Detected {DEVICE_COUNT} GPUs "
+        "— using distributed mode")
 ```
 
 ### Environment Variables

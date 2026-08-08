@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2550" height="3300" viewBox="0 0 2550 3300">
+<title>Inside Unsloth — cover 8.5 × 11 in</title>
+<defs><linearGradient id="panel" x1="0" y1="2100" x2="2550" y2="3300" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#1e3c72"></stop><stop offset="1" stop-color="#2a5298"></stop></linearGradient>
+<clipPath id="panelClip"><rect x="0" y="2100" width="2550" height="1200"></rect></clipPath></defs>
+<rect width="2550" height="3300" fill="#f7f8fa"></rect>
+<rect x="210" y="200" width="150" height="20" fill="#ff6b42"></rect>
+<text x="400" y="210" dominant-baseline="middle" font-family="ui-monospace, &#39;SF Mono&#39;, Menlo, monospace" font-size="46" letter-spacing="11" fill="#56657f">THE INSIDE SERIES  /  NO. 01</text>
+<text x="210" y="660" font-family="Myriad Pro" font-weight="300" font-size="200" letter-spacing="-4" fill="#56657f">Inside</text>
+<text x="206" y="980" font-family="Myriad Pro" font-weight="700" font-size="360" letter-spacing="-14.4" fill="#14213d">Unsloth</text>
+<text font-family="Myriad Pro" font-weight="300" font-size="88" fill="#3d4c64"><tspan x="210" y="1230">How the Fastest LLM Fine‑Tuning Library</tspan><tspan x="210" y="1340">Works</tspan></text>
+<text x="210" y="1950" font-family="Myriad Pro" font-weight="600" font-size="78" fill="#14213d">Erich Champion</text>
+<text x="2340" y="1939" text-anchor="end" font-family="ui-monospace, &#39;SF Mono&#39;, Menlo, monospace" font-size="40" letter-spacing="7" fill="#6b7a90">40 CH · 9 PARTS · 100% OPEN SOURCE</text>
+<rect x="0" y="2100" width="2550" height="1200" fill="url(#panel)"></rect>
+<g clip-path="url(#panelClip)"><g transform="translate(253.7 2100) scale(1.2766)"><g stroke="#ffffff" stroke-opacity="0.16" stroke-width="2"><line x1="-400" y1="-100" x2="-400" y2="1040"></line><line x1="-300" y1="-100" x2="-300" y2="1040"></line><line x1="-200" y1="-100" x2="-200" y2="1040"></line><line x1="-100" y1="-100" x2="-100" y2="1040"></line><line x1="0" y1="-100" x2="0" y2="1040"></line><line x1="100" y1="-100" x2="100" y2="1040"></line><line x1="200" y1="-100" x2="200" y2="1040"></line><line x1="300" y1="-100" x2="300" y2="1040"></line><line x1="400" y1="-100" x2="400" y2="1040"></line><line x1="500" y1="-100" x2="500" y2="1040"></line><line x1="600" y1="-100" x2="600" y2="1040"></line><line x1="700" y1="-100" x2="700" y2="1040"></line><line x1="800" y1="-100" x2="800" y2="1040"></line><line x1="900" y1="-100" x2="900" y2="1040"></line><line x1="1000" y1="-100" x2="1000" y2="1040"></line><line x1="1100" y1="-100" x2="1100" y2="1040"></line><line x1="1200" y1="-100" x2="1200" y2="1040"></line><line x1="1300" y1="-100" x2="1300" y2="1040"></line><line x1="1400" y1="-100" x2="1400" y2="1040"></line><line x1="1500" y1="-100" x2="1500" y2="1040"></line><line x1="1600" y1="-100" x2="1600" y2="1040"></line><line x1="1700" y1="-100" x2="1700" y2="1040"></line><line x1="1800" y1="-100" x2="1800" y2="1040"></line><line x1="1900" y1="-100" x2="1900" y2="1040"></line><line x1="2000" y1="-100" x2="2000" y2="1040"></line><line x1="-400" y1="0" x2="2000" y2="0"></line><line x1="-400" y1="100" x2="2000" y2="100"></line><line x1="-400" y1="200" x2="2000" y2="200"></line><line x1="-400" y1="300" x2="2000" y2="300"></line><line x1="-400" y1="400" x2="2000" y2="400"></line><line x1="-400" y1="500" x2="2000" y2="500"></line><line x1="-400" y1="600" x2="2000" y2="600"></line><line x1="-400" y1="700" x2="2000" y2="700"></line><line x1="-400" y1="800" x2="2000" y2="800"></line><line x1="-400" y1="900" x2="2000" y2="900"></line></g>
+    <rect x="200" y="200" width="300" height="300" fill="#ff6b42"></rect>
+    <rect x="500" y="200" width="300" height="300" fill="#ff6b42" fill-opacity="0.55"></rect>
+    <rect x="200" y="500" width="600" height="200" fill="#ff6b42" fill-opacity="0.22" stroke="#ff6b42" stroke-width="4"></rect>
+    <g stroke="#ffffff" stroke-opacity="0.9" stroke-width="4" fill="none">
+      <rect x="900" y="200" width="500" height="500"></rect>
+      <line x1="900" y1="400" x2="1400" y2="400"></line><line x1="1100" y1="200" x2="1100" y2="700"></line>
+    </g>
+    <text x="200" y="830" font-family="ui-monospace, &#39;SF Mono&#39;, Menlo, monospace" font-size="30" letter-spacing="6" fill="#ffffff" fill-opacity="0.62">FUSED KERNEL TILES</text></g></g>
+</svg>

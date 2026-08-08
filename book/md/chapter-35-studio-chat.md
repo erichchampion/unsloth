@@ -31,11 +31,16 @@ Each chat session maintains its own conversation history:
 ```python
 # Simplified session model
 class ChatSession:
-    id: str                          # Unique session identifier
-    model_name: str                  # Which model is loaded
-    messages: list[ChatMessage]      # Full conversation history
-    parameters: InferenceParams      # Temperature, top_p, max_tokens, etc.
-    template: str                    # Chat template name
+    # Unique session identifier
+    id: str
+    # Which model is loaded
+    model_name: str
+    # Full conversation history
+    messages: list[ChatMessage]
+    # Temperature, top_p, max_tokens, etc.
+    parameters: InferenceParams
+    # Chat template name
+    template: str
 ```
 
 ### Inference Parameters
@@ -82,7 +87,8 @@ Studio supports function calling — the model can invoke predefined tools (web 
 
 ```
 User:     "What's the weather in Tokyo?"
-Model:    <tool_call>{"name": "web_search", "args": {"query": "weather tokyo"}}</tool_call>
+Model:    <tool_call>{"name": "web_search",
+            "args": {"query": "weather tokyo"}}</tool_call>
 System:   [executes web search, returns results]
 Model:    "The current temperature in Tokyo is 22°C with partly cloudy skies."
 ```
@@ -92,7 +98,7 @@ Model:    "The current temperature in Tokyo is 22°C with partly cloudy skies."
 If the model generates malformed tool call JSON, Studio automatically retries:
 
 ```
-Attempt 1: {"name": "search", "args": {"query": "weather"    ← Missing closing brace
+Attempt 1: {"name": "search", "args": {"query": "weather"  ← missing brace
             → Parse error detected
 Attempt 2: Model receives error feedback, regenerates
             {"name": "search", "args": {"query": "weather"}}  ← Valid JSON

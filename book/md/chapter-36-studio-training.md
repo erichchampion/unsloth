@@ -81,16 +81,19 @@ The training route (`routes/training.py`) delegates to `core/training/`:
 @router.post("/api/training/start")
 async def start_training(config: TrainingConfig):
     # 1. Load model with Unsloth
-    model, tokenizer = FastLanguageModel.from_pretrained(config.model_name, ...)
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        config.model_name, ...)
 
     # 2. Apply LoRA
-    model = FastLanguageModel.get_peft_model(model, r=config.lora_rank, ...)
+    model = FastLanguageModel.get_peft_model(
+        model, r=config.lora_rank, ...)
 
     # 3. Load dataset
     dataset = load_dataset(config.dataset_name, ...)
 
     # 4. Create trainer
-    trainer = UnslothTrainer(model=model, args=training_args, ...)
+    trainer = UnslothTrainer(
+        model=model, args=training_args, ...)
 
     # 5. Start training in background thread
     training_task = asyncio.create_task(trainer.train())

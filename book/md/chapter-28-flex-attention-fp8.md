@@ -35,7 +35,8 @@ def causal_score_mod(score, b, h, q_idx, kv_idx):
     """Causal masking: mask future tokens."""
     return torch.where(q_idx >= kv_idx, score, -float('inf'))
 
-output = flex_attention(query, key, value, score_mod=causal_score_mod)
+output = flex_attention(
+    query, key, value, score_mod=causal_score_mod)
 ```
 
 ### Unsloth's FlexAttention Wrapper

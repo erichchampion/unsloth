@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -11,7 +12,9 @@ from datetime import datetime
 # --- CONFIGURATION ---
 DITA_DIR = "dita"
 METADATA_FILE = "metadata.yaml"
-DITA_COMMAND = "dita"
+# publish-book.zsh runs non-interactively, so the toolkit location cannot
+# depend on an interactive shell's PATH.
+DITA_COMMAND = os.environ.get("DITA_COMMAND", "dita")
 LOG_FILE = "generate-pdf.log"
 
 # ---------------------------------------------------------------------
@@ -46,184 +49,6 @@ def load_metadata(metadata_file: str = METADATA_FILE) -> dict:
     except yaml.YAMLError as e:
         log(f"⚠️  Warning: Error parsing {metadata_file}: {e}")
         return {'title': 'Building AI Coding Assistants', 'language': 'en'}
-
-def create_pdf_customization(dita_dir: Path):
-    """Create a custom PDF configuration for better TOC styling."""
-    custom_dir = dita_dir / "pdf-custom"
-    custom_dir.mkdir(exist_ok=True)
-
-    cfg_dir = custom_dir / "cfg" / "fo" / "attrs"
-    cfg_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create custom TOC and image attribute configuration
-    toc_attrs = """<?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-                xmlns:fo="http://www.w3.org/1999/XSL/Format"
-                version="2.0">
-
-  <!-- TOC indent for nested levels -->
-  <xsl:attribute-set name="__toc__indent">
-    <xsl:attribute name="start-indent">
-      <xsl:variable name="level" select="count(ancestor-or-self::*[contains(@class, ' topic/topic ')])"/>
-      <xsl:value-of select="concat($level * 12, 'pt')"/>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- TOC entry styling by level -->
-  <xsl:attribute-set name="__toc__topic__content">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-    <xsl:attribute name="font-weight">
-      <xsl:variable name="level" select="count(ancestor-or-self::*[contains(@class, ' topic/topic ')])"/>
-      <xsl:choose>
-        <xsl:when test="$level = 1">bold</xsl:when>
-        <xsl:otherwise>normal</xsl:otherwise>
-      </xsl:choose>
-    </xsl:attribute>
-    <xsl:attribute name="font-size">
-      <xsl:variable name="level" select="count(ancestor-or-self::*[contains(@class, ' topic/topic ')])"/>
-      <xsl:choose>
-        <xsl:when test="$level = 1">14pt</xsl:when>
-        <xsl:when test="$level = 2">12pt</xsl:when>
-        <xsl:otherwise>10pt</xsl:otherwise>
-      </xsl:choose>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Global font family settings for consistency -->
-  <xsl:attribute-set name="common.border__top">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="common.border__bottom">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Body text -->
-  <xsl:attribute-set name="body__toplevel">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="topic">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Title and headings -->
-  <xsl:attribute-set name="topic.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="topic.topic.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="section.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Paragraphs and text -->
-  <xsl:attribute-set name="p">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Lists -->
-  <xsl:attribute-set name="ul">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="ol">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Tables -->
-  <xsl:attribute-set name="table">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="table.title">
-    <xsl:attribute name="font-family">sans-serif</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Standalone figure images: full size, max 50% of page width -->
-  <xsl:attribute-set name="image" use-attribute-sets="image__block">
-  </xsl:attribute-set>
-
-  <xsl:attribute-set name="image__block">
-    <xsl:attribute name="content-width">
-      <xsl:text>scale-to-fit</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="content-height">
-      <xsl:text>100%</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="width">
-      <xsl:text>100%</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="max-width">
-      <xsl:text>5in</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="scaling">
-      <xsl:text>uniform</xsl:text>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Inline icon images: height limited to line height, preserve aspect ratio -->
-  <xsl:attribute-set name="image__inline">
-    <xsl:attribute name="content-height">
-      <xsl:text>1em</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="content-width">
-      <xsl:text>scale-to-fit</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="scaling">
-      <xsl:text>uniform</xsl:text>
-    </xsl:attribute>
-    <xsl:attribute name="vertical-align">
-      <xsl:text>middle</xsl:text>
-    </xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Code block syntax highlighting -->
-  <xsl:attribute-set name="codeblock">
-    <xsl:attribute name="font-family">monospace</xsl:attribute>
-    <xsl:attribute name="font-size">8pt</xsl:attribute>
-    <xsl:attribute name="background-color">#f5f5f5</xsl:attribute>
-    <xsl:attribute name="padding">6pt</xsl:attribute>
-    <xsl:attribute name="border">0.5pt solid #cccccc</xsl:attribute>
-    <xsl:attribute name="keep-together.within-page">auto</xsl:attribute>
-    <xsl:attribute name="white-space-treatment">preserve</xsl:attribute>
-    <xsl:attribute name="linefeed-treatment">preserve</xsl:attribute>
-    <xsl:attribute name="white-space-collapse">false</xsl:attribute>
-    <xsl:attribute name="wrap-option">wrap</xsl:attribute>
-  </xsl:attribute-set>
-
-  <!-- Inline code -->
-  <xsl:attribute-set name="codeph">
-    <xsl:attribute name="font-family">monospace</xsl:attribute>
-    <xsl:attribute name="font-size">0.9em</xsl:attribute>
-    <xsl:attribute name="background-color">#f5f5f5</xsl:attribute>
-    <xsl:attribute name="padding-left">2pt</xsl:attribute>
-    <xsl:attribute name="padding-right">2pt</xsl:attribute>
-  </xsl:attribute-set>
-
-</xsl:stylesheet>
-"""
-
-    toc_attrs_file = cfg_dir / "toc-attr.xsl"
-    with open(toc_attrs_file, "w", encoding="utf-8") as f:
-        f.write(toc_attrs)
-
-    # Create plugin configuration
-    plugin_xml = """<?xml version="1.0" encoding="UTF-8"?>
-<plugin id="com.custom.pdf">
-  <feature extension="dita.conductor.xslt.param" file="cfg/fo/attrs/toc-attr.xsl"/>
-</plugin>
-"""
-
-    plugin_file = custom_dir / "plugin.xml"
-    with open(plugin_file, "w", encoding="utf-8") as f:
-        f.write(plugin_xml)
-
-    log(f"✅ Created PDF customization in {custom_dir}")
-    return custom_dir
 
 def run_dita_ot(ditamap_path: Path, output_dir: Path, output_pdf: str, dita_dir: Path, metadata: dict = None):
     """Run DITA-OT to generate PDF with metadata."""
@@ -264,8 +89,14 @@ def run_dita_ot(ditamap_path: Path, output_dir: Path, output_pdf: str, dita_dir:
         log(f"❌ Error checking installed plugins: {e}")
         sys.exit(1)
 
-    # Create custom PDF configuration
-    custom_dir = create_pdf_customization(dita_dir)
+    # There used to be a create_pdf_customization() call here. It wrote a
+    # `com.custom.pdf` plugin into dita/pdf-custom/ on every run — 8pt
+    # grey-boxed codeblock attribute sets and a TOC override — but the plugin
+    # was never installed and never passed to `dita`, so none of it reached the
+    # PDF. It also declared the extension point `dita.conductor.xslt.param`,
+    # which is not where attribute-set overrides go (`dita.xsl.xslfo` is), so
+    # installing it would not have worked either. PDF code styling comes from
+    # pdf-theme/cfg/fo/attrs/pr-domain-attr.xsl.
 
     # Run DITA-OT
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -306,10 +137,89 @@ def run_dita_ot(ditamap_path: Path, output_dir: Path, output_pdf: str, dita_dir:
         log(e.stderr)
         sys.exit(1)
 
+def page_size(gs_command: str, pdf: Path):
+    """The first page's MediaBox as (width, height) in points, or None.
+
+    Ghostscript is already a hard requirement here, so the size is read with
+    it rather than by adding a second PDF library to the toolchain.
+    """
+    # The path is interpolated into a PostScript string literal.
+    escaped = re.sub(r"([()\\])", r"\\\1", str(pdf))
+    query = (
+        f"({escaped}) (r) file runpdfbegin 1 pdfgetpage "
+        "/MediaBox pget {==} {(none) =} ifelse quit"
+    )
+
+    try:
+        result = subprocess.run(
+            [gs_command, "-q", "-dNODISPLAY", "-dNOSAFER", "-c", query],
+            capture_output=True, text=True, check=True, timeout=60,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+
+    found = re.search(r"\[\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s*\]",
+                      result.stdout)
+    if not found:
+        return None
+
+    x0, y0, x1, y1 = (float(n) for n in found.groups())
+    return abs(x1 - x0), abs(y1 - y0)
+
+
+def normalise_cover(gs_command: str, cover_pdf: Path, target, work_dir: Path):
+    """Rescale the cover to the body's page size, or return it unchanged.
+
+    The cover art is exported at 300 dpi, and its page box carries those
+    pixels as if they were points: 2550x3300 against the body's 612x792, the
+    same 8.5x11 inches at 4.167 times the size. Acrobat and Preview both
+    believe it, so the book opens on a cover page nearly three feet wide.
+
+    The aspect ratios match, so fitting the page is a pure scale — no crop, no
+    letterboxing. Comparing renders of the two at the same pixel size, 42 of
+    935,000 pixels differ, all of them antialiasing along glyph edges.
+    """
+    size = page_size(gs_command, cover_pdf)
+    if size is None:
+        log("   ⚠️  Could not read the cover's page size; using it unchanged")
+        return cover_pdf
+
+    # A point either way is well inside what rounding explains.
+    if max(abs(size[0] - target[0]), abs(size[1] - target[1])) < 1.0:
+        return cover_pdf
+
+    log(f"   Cover is {size[0]:g}x{size[1]:g}pt against the body's "
+        f"{target[0]:g}x{target[1]:g}pt; rescaling")
+
+    scaled = work_dir / "cover_letter.pdf"
+    cmd = [
+        gs_command, "-dBATCH", "-dNOPAUSE", "-q",
+        "-sDEVICE=pdfwrite",
+        "-dPDFSETTINGS=/prepress",
+        f"-dDEVICEWIDTHPOINTS={target[0]:g}",
+        f"-dDEVICEHEIGHTPOINTS={target[1]:g}",
+        "-dFIXEDMEDIA",   # the page box becomes the size asked for
+        "-dPDFFitPage",   # and the art is scaled into it
+        f"-sOutputFile={scaled}",
+        str(cover_pdf),
+    ]
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        log("   ⚠️  Could not rescale the cover; using it unchanged")
+        log(exc.stderr)
+        return cover_pdf
+
+    return scaled
+
+
 def combine_with_cover_page(output_pdf: str):
     """
     Post-processing step to combine 8.5x11.pdf with the generated user guide PDF.
     Uses ghostscript to redistill and combine PDFs with 8.5x11.pdf as the first page.
+
+    The cover is rescaled to the body's page size first — see normalise_cover().
     """
     output_path = Path(output_pdf)
     output_dir = output_path.parent if output_path.parent != Path('.') else Path.cwd()
@@ -337,6 +247,17 @@ def combine_with_cover_page(output_pdf: str):
         log("   Install ghostscript: brew install ghostscript")
         return
 
+    # Match the cover to the body rather than the other way round: the body is
+    # whatever trim size the PDF theme was built for, and is already right.
+    target = page_size(gs_command, output_path)
+    if target is None:
+        log("   ⚠️  Could not read the body's page size; leaving the cover alone")
+        combined_cover = cover_pdf
+    else:
+        combined_cover = normalise_cover(
+            gs_command, cover_pdf, target, output_path.parent
+        )
+
     # Create temporary output file
     temp_output = output_path.parent / f"{output_path.stem}_combined.pdf"
 
@@ -349,7 +270,7 @@ def combine_with_cover_page(output_pdf: str):
         "-sDEVICE=pdfwrite",
         "-dPDFSETTINGS=/prepress",  # High quality output
         f"-sOutputFile={temp_output}",
-        str(cover_pdf),
+        str(combined_cover),
         str(output_path)
     ]
 
@@ -369,6 +290,11 @@ def combine_with_cover_page(output_pdf: str):
         if temp_output.exists():
             temp_output.unlink()
         log(f"⚠️  Continuing with original PDF (not combined)")
+
+    finally:
+        # The rescaled cover is scratch; the original 8.5x11.pdf is not.
+        if combined_cover != cover_pdf and combined_cover.exists():
+            combined_cover.unlink()
 
 # ---------------------------------------------------------------------
 def main():

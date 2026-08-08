@@ -33,7 +33,9 @@ This chapter traces the code through `unsloth/trainer.py` (484 lines) to explain
 ```python
 # trainer.py (lines 133-136)
 class UnslothTrainingArguments(TrainingArguments):
-    def __init__(self, embedding_learning_rate: float = None, *args, **kwargs):
+    def __init__(
+        self, embedding_learning_rate: float = None, *args,
+        **kwargs):
         super().__init__(*args, **kwargs)
         self.embedding_learning_rate = embedding_learning_rate
 ```
@@ -50,7 +52,8 @@ This allows embedding layers (input embeddings and language model head) to use a
 # trainer.py (lines 182-198)
 class UnslothTrainer(SFTTrainer):
     def create_optimizer(self):
-        embedding_learning_rate = getattr(self.args, "embedding_learning_rate", None)
+        embedding_learning_rate = getattr(
+            self.args, "embedding_learning_rate", None)
         if embedding_learning_rate is None:
             return super().create_optimizer()
         # Create optimizer with separate parameter groups
@@ -104,8 +107,10 @@ Some architectures are incompatible with packing:
 ```python
 # trainer.py (lines 57-60)
 PADDING_FREE_BLOCKLIST = {
-    "gemma2",   # slow_attention_softcapping has torch.compile issues
-    "gpt_oss",  # FlexAttention doesn't handle padding_free correctly
+    # slow_attention_softcapping has torch.compile issues
+    "gemma2",
+    # FlexAttention doesn't handle padding_free correctly
+    "gpt_oss",
 }
 ```
 
@@ -126,7 +131,8 @@ The auto-detection logic:
 def _should_auto_padding_free(config):
     if config is None or _AUTO_PADDING_FREE_ENV_DISABLED:
         return False
-    if getattr(config, "packing", False):  # Packing takes priority
+    # Packing takes priority
+    if getattr(config, "packing", False):
         return False
     return getattr(config, "padding_free", None) is None
 ```
@@ -149,11 +155,16 @@ The `_patch_trl_trainer()` function (lines 455-483) discovers all TRL trainer/co
 
 ```python
 def _patch_trl_trainer():
-    trl_trainers = set(x[:-len("Trainer")] for x in dir(trl.trainer) if x.endswith("Trainer"))
-    trl_configs = set(x[:-len("Config")] for x in dir(trl.trainer) if x.endswith("Config"))
+    trl_trainers = set(
+        x[:-len("Trainer")] for x in dir(trl.trainer)
+        if x.endswith("Trainer"))
+    trl_configs = set(
+        x[:-len("Config")] for x in dir(trl.trainer)
+        if x.endswith("Config"))
     # Patch only classes that have both a Trainer and a Config
     for x in (trl_trainers & trl_configs):
-        trl.{x}Trainer.__init__ = _backwards_compatible_trainer(trl.{x}Trainer, trl.{x}Config)
+        trl.{x}Trainer.__init__ = _backwards_compatible_trainer(
+            trl.{x}Trainer, trl.{x}Config)
 ```
 
 ---
@@ -166,10 +177,12 @@ For older transformers (≤ 4.45.2), there was a bug in gradient accumulation th
 # trainer.py (lines 105-124)
 if Version(transformers_version) > Version("4.45.2"):
     def unsloth_train(trainer, *args, **kwargs):
-        return trainer.train(*args, **kwargs)  # Standard training
+        # Standard training
+        return trainer.train(*args, **kwargs)
 else:
     def unsloth_train(trainer, *args, **kwargs):
-        return _unsloth_train(trainer)  # Custom fixed training loop
+        # Custom fixed training loop
+        return _unsloth_train(trainer)
 ```
 
 ---

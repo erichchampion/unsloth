@@ -79,11 +79,16 @@ The `device_type.py` module (and its counterpart in `unsloth_zoo`) detects the a
 
 ```python
 # From unsloth_zoo/device_type.py — used everywhere
-DEVICE_TYPE           # "cuda", "hip", or "xpu"
-DEVICE_TYPE_TORCH     # "cuda" (for hip too, since ROCm uses CUDA API)
-DEVICE_COUNT          # Number of available GPUs
-ALLOW_PREQUANTIZED_MODELS   # False for AMD GPUs with bitsandbytes < 0.49.2
-ALLOW_BITSANDBYTES    # False when bitsandbytes is unstable (AMD)
+# "cuda", "hip", or "xpu"
+DEVICE_TYPE
+# "cuda" (for hip too, since ROCm uses CUDA API)
+DEVICE_TYPE_TORCH
+# Number of available GPUs
+DEVICE_COUNT
+# False for AMD GPUs with bitsandbytes < 0.49.2
+ALLOW_PREQUANTIZED_MODELS
+# False when bitsandbytes is unstable (AMD)
+ALLOW_BITSANDBYTES
 ```
 
 For NVIDIA GPUs, compute capability determines which features are available. Ampere (SM 8.0) and above get bfloat16 support — older GPUs fall back to float16:
@@ -129,8 +134,10 @@ Flash Attention (`flash-attn >= 2.6.3`) is optional but recommended for Ampere+ 
 
 ```python
 # From models/_utils.py — checked during model loading
-HAS_FLASH_ATTENTION              # True if flash-attn is installed
-HAS_FLASH_ATTENTION_SOFTCAPPING  # True if flash-attn >= 2.6.3
+# True if flash-attn is installed
+HAS_FLASH_ATTENTION
+# True if flash-attn >= 2.6.3
+HAS_FLASH_ATTENTION_SOFTCAPPING
 ```
 
 ---

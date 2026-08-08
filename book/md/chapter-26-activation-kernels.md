@@ -73,14 +73,20 @@ def _fg_kernel(e, g, h, n_elements,
     offsets = block_idx * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
     
-    e_row = tl.load(e + offsets, mask=mask, other=0).to(tl.float32)  # FP32 accumulation
+    # FP32 accumulation
+    e_row = tl.load(
+        e + offsets, mask=mask, other=0).to(tl.float32)
     g_row = tl.load(g + offsets, mask=mask, other=0)
     
-    f_row = e_row * tl.sigmoid(e_row)  # SiLU = x * σ(x) — computed in-register
-    f_row = f_row.to(g_row.dtype)      # Cast back to model dtype (bf16/fp16)
-    h_row = f_row * g_row              # Gate × Up — the GLU operation
+    # SiLU = x * σ(x) — computed in-register
+    f_row = e_row * tl.sigmoid(e_row)
+    # Cast back to model dtype (bf16/fp16)
+    f_row = f_row.to(g_row.dtype)
+    # Gate × Up — the GLU operation
+    h_row = f_row * g_row
     
-    tl.store(h + offsets, h_row, mask=mask)  # Single write
+    # Single write
+    tl.store(h + offsets, h_row, mask=mask)
 ```
 
 ### Source Code Walkthrough: The SwiGLU Backward Kernel
@@ -158,11 +164,11 @@ The backward pass must compute gradients for both `gate_proj` and `up_proj` weig
 
 ```python
 # d_output is given
-d_gate = d_output * up                    # Scale by up
-d_gate = d_gate * silu_backward(gate)     # Through SiLU derivative
-d_up = d_output * silu(gate)              # Scale by activated gate
-d_gate_proj = d_gate @ x.T                # Weight gradient
-d_up_proj = d_up @ x.T                    # Weight gradient
+d_gate = d_output * up                # Scale by up
+d_gate = d_gate * silu_backward(gate) # Through SiLU derivative
+d_up = d_output * silu(gate)          # Scale by activated gate
+d_gate_proj = d_gate @ x.T            # Weight gradient
+d_up_proj = d_up @ x.T                # Weight gradient
 ```
 
 The fused backward kernel recomputes `silu(gate)` from the saved input rather than storing it, trading a small amount of compute for significant memory savings (gradient checkpointing at the kernel level).
@@ -188,7 +194,8 @@ output = swiglu(gate_proj(x), up_proj(x))
 # Process in tiles of size T:
 for i in range(0, seq_len, tile_size):
     tile = x[:, i:i+tile_size, :]
-    output[:, i:i+tile_size, :] = swiglu(gate_proj(tile), up_proj(tile))
+    output[:, i:i+tile_size, :] = swiglu(
+        gate_proj(tile), up_proj(tile))
 ```
 
 This reduces peak memory further at the cost of slightly more kernel launches.

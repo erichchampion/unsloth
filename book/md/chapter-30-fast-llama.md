@@ -120,8 +120,10 @@ When applying LoRA adapters, PEFT wraps the model in a `PeftModelForCausalLM`. T
 
 ```python
 # The two-step process:
-model = peft.get_peft_model(model, lora_config)    # PEFT wrapping (may break patches)
-FastLlamaModel.patch_peft_model(model, ...)         # Restore Unsloth patches
+# PEFT wrapping (may break patches)
+model = peft.get_peft_model(model, lora_config)
+# Restore Unsloth patches
+FastLlamaModel.patch_peft_model(model, ...)
 ```
 
 `patch_peft_model()` walks through the now-wrapped model and re-applies the Triton kernel replacements to the PEFT `LoraLayer` objects.

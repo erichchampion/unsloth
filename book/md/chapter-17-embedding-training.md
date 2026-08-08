@@ -78,16 +78,20 @@ model = FastLanguageModel.get_peft_model(
     target_modules = [
         "q_proj", "k_proj", "v_proj", "o_proj",
         "gate_proj", "up_proj", "down_proj",
-        "embed_tokens",  # Include input embeddings
-        "lm_head",       # Include output head
+        # Include input embeddings
+        "embed_tokens",
+        # Include output head
+        "lm_head",
     ],
 )
 
 trainer = UnslothTrainer(
     model = model,
     args = UnslothTrainingArguments(
-        learning_rate = 2e-4,            # LoRA adapter LR
-        embedding_learning_rate = 5e-5,  # Embedding layer LR (lower)
+        # LoRA adapter LR
+        learning_rate = 2e-4,
+        # Embedding layer LR (lower)
+        embedding_learning_rate = 5e-5,
         output_dir = "./embedding_output",
     ),
     train_dataset = pairs_dataset,

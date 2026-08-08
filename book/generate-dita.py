@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import sys
 import shutil
 import yaml
@@ -123,6 +124,193 @@ def generate_anchor_slug(text: str) -> str:
     # Remove leading/trailing hyphens
     slug = slug.strip('-')
     return slug
+
+# Code lines longer than this wrap on a Kindle rather than scrolling — Amazon
+# supports `overflow` only as `hidden`, so there is no scrollable region to put
+# a wide code sample in. These are starting points to calibrate against Kindle
+# Previewer at the default font size on a 6" profile, not settled numbers.
+CODE_LINE_WARN = 56
+CODE_LINE_MAX = 64
+# A token wider than this cannot break, and is clipped rather than wrapped.
+CODE_TOKEN_MAX = 58
+CODE_LINE_REPORT = "code-line-report.txt"
+
+
+def report_long_code_lines(md_dir: Path) -> int:
+    """List every fenced-code line too long to fit a Kindle screen.
+
+    Reports against the Markdown, not the generated DITA, because the Markdown
+    is what gets edited. Never fails the build: this is a worklist, and the
+    ASCII diagrams in it cannot be fixed by shortening a line anyway.
+
+    Returns the number of lines over CODE_LINE_MAX.
+    """
+    findings = []
+    unbreakable = []
+
+    for md_file in sorted(md_dir.glob("*.md")):
+        in_fence = False
+        fence_marker = None
+
+        for number, line in enumerate(md_file.read_text(encoding="utf-8").split("\n"), 1):
+            stripped = line.lstrip()
+
+            if not in_fence:
+                if stripped.startswith("```") or stripped.startswith("~~~"):
+                    in_fence = True
+                    fence_marker = stripped[:3]
+                continue
+
+            if stripped.startswith(fence_marker):
+                in_fence = False
+                fence_marker = None
+                continue
+
+            if len(line) > CODE_LINE_WARN:
+                findings.append((md_file.name, number, len(line), line))
+
+            # An unbreakable run wider than a line is worse than a long line.
+            # The stylesheet uses `word-break: normal`, because break-all split
+            # words mid-token on Kindle even when the whole word would have
+            # fitted on the next line. The cost is that a token too wide to fit
+            # cannot break at all, and `overflow` is supported only as `hidden`,
+            # so it is clipped and the text is lost.
+            for token in line.split():
+                if len(token) > CODE_TOKEN_MAX:
+                    unbreakable.append((md_file.name, number, len(token), token))
+
+    if unbreakable:
+        log(f"✂️  {len(unbreakable)} unbreakable token(s) over {CODE_TOKEN_MAX} "
+            f"characters — these clip rather than wrap:")
+        for name, number, length, token in sorted(unbreakable, key=lambda x: -x[2]):
+            log(f"   {name}:{number} ({length}) {token[:60]}")
+
+    over_max = [f for f in findings if f[2] > CODE_LINE_MAX]
+
+    if not findings:
+        log(f"✅ No code lines exceed {CODE_LINE_WARN} characters")
+        return 0
+
+    by_file = {}
+    for name, number, length, text in findings:
+        by_file.setdefault(name, []).append((number, length, text))
+
+    log(f"📏 Code line lengths: {len(over_max)} line(s) over {CODE_LINE_MAX}, "
+        f"{len(findings) - len(over_max)} between {CODE_LINE_WARN + 1} and {CODE_LINE_MAX}")
+    log(f"   Full list: {CODE_LINE_REPORT}")
+
+    for name in sorted(by_file, key=lambda n: -max(x[1] for x in by_file[n])):
+        entries = by_file[name]
+        worst = max(x[1] for x in entries)
+        count = sum(1 for x in entries if x[1] > CODE_LINE_MAX)
+        if count:
+            log(f"   {name}: {count} over {CODE_LINE_MAX}, longest {worst}")
+
+    with open(CODE_LINE_REPORT, "w", encoding="utf-8") as report:
+        report.write(
+            f"Fenced-code lines longer than {CODE_LINE_WARN} characters.\n"
+            f"Lines over {CODE_LINE_MAX} are marked OVER; those will wrap on a\n"
+            f"6\" Kindle at the default font size. Kindle cannot scroll a code\n"
+            f"block horizontally, so the fix is to shorten the source line.\n\n"
+        )
+        for name in sorted(by_file):
+            report.write(f"{name}\n")
+            for number, length, text in sorted(by_file[name]):
+                flag = "OVER" if length > CODE_LINE_MAX else "    "
+                report.write(f"  {flag} {number:>5}  {length:>3}  {text}\n")
+            report.write("\n")
+
+    return len(over_max)
+
+
+# Fence languages Prism has no grammar for, mapped to the nearest one it does.
+# An unknown language makes fox.jason.prismjs emit PRSM002W and skip the block,
+# so it silently loses its highlighting in both the PDF and the EPUB.
+PRISM_LANGUAGE_ALIASES = {
+    "jsonc": "json",
+    "sh": "bash",
+    "shell": "bash",
+    "zsh": "bash",
+    "console": "bash",
+    "yml": "yaml",
+    "ts": "typescript",
+    "js": "javascript",
+    "py": "python",
+    "text": None,   # plain text: no highlighting wanted
+    "txt": None,
+    "plain": None,
+}
+
+# Characters that only ever appear in a drawn diagram, never in source code.
+_DIAGRAM_UNICODE = re.compile(r"[←-⇿─-╿]")
+
+# A line made of nothing but connector glyphs and whitespace.
+_CONNECTOR_ONLY = re.compile(r"^[\s|+\-<>^v/\\.'`~=*_]+$")
+
+# A line that opens with a connector, as the branches of an ASCII tree do.
+_CONNECTOR_START = re.compile(r"^\s*[|+`\\]")
+
+
+def looks_like_diagram(code_text: str) -> bool:
+    """Is this fenced block a drawn diagram rather than source code?
+
+    Diagrams get no `outputclass`, so Prism leaves them alone. Tokenizing one
+    as bash — which the heuristics below happily did, since `|` and `-` are
+    everywhere in an ASCII tree — colours arbitrary fragments of the drawing
+    and produces highlighting that means nothing.
+    """
+    if not code_text or not code_text.strip():
+        return False
+
+    if _DIAGRAM_UNICODE.search(code_text):
+        return True
+
+    lines = [line for line in code_text.split("\n") if line.strip()]
+    if len(lines) < 3:
+        return False
+
+    connector_only = sum(1 for line in lines if _CONNECTOR_ONLY.match(line))
+    structural = sum(
+        1 for line in lines
+        if _CONNECTOR_ONLY.match(line) or _CONNECTOR_START.match(line)
+        or "-->" in line or "<--" in line
+    )
+
+    # At least one pure connector line, and a third of the block structural.
+    return connector_only >= 1 and structural >= max(2, len(lines) // 3)
+
+
+def resolve_code_outputclass(explicit: str, code_text: str) -> str:
+    """Settle the @outputclass for one fenced block, or None for neither.
+
+    Returns `language-x` for source code, `diagram` for a drawing, None when
+    the block is neither.
+
+    Diagrams are marked rather than merely left unhighlighted. A code sample
+    that wraps is still readable — that is what the hanging indent in ebook.css
+    is for — but a wrapped diagram is destroyed, because its meaning is in the
+    column alignment. Marking them lets the stylesheet set them at a size that
+    fits the screen instead, which is the only way to keep a 78-column drawing
+    intact on a 6" Kindle.
+    """
+    if explicit:
+        normalized = explicit.strip().lower()
+        if normalized in PRISM_LANGUAGE_ALIASES:
+            mapped = PRISM_LANGUAGE_ALIASES[normalized]
+            if mapped != normalized:
+                log(f"🔤 Fence language '{normalized}' -> "
+                    f"{mapped or 'none (plain text)'}")
+            if not mapped:
+                return "diagram" if looks_like_diagram(code_text) else None
+            return f"language-{mapped}"
+        return f"language-{normalized}"
+
+    if looks_like_diagram(code_text):
+        return "diagram"
+
+    detected = detect_language(code_text)
+    return f"language-{detected}" if detected else None
+
 
 def detect_language(code_text: str) -> str:
     """
@@ -331,26 +519,17 @@ def convert_list_item_content(li_element) -> list:
                     language = classes.replace("language-", "")
 
                 code_text = code_elem.get_text()
+                outputclass = resolve_code_outputclass(language, code_text)
 
-                # Auto-detect language if not specified
-                if not language:
-                    detected = detect_language(code_text)
-                    if detected:
-                        language = detected
-                        log(f"🔍 Auto-detected language in list: {language}")
-
-                if language:
-                    result.append(f'<codeblock outputclass="language-{language}">{escape_xml(code_text)}</codeblock>')
+                if outputclass:
+                    result.append(f'<codeblock outputclass="{outputclass}">{escape_xml(code_text)}</codeblock>')
                 else:
                     result.append(f'<codeblock>{escape_xml(code_text)}</codeblock>')
             else:
                 code_text = child.get_text()
-
-                # Try auto-detection for pre blocks without code element
-                detected = detect_language(code_text)
-                if detected:
-                    log(f"🔍 Auto-detected language in list: {detected}")
-                    result.append(f'<codeblock outputclass="language-{detected}">{escape_xml(code_text)}</codeblock>')
+                outputclass = resolve_code_outputclass(None, code_text)
+                if outputclass:
+                    result.append(f'<codeblock outputclass="{outputclass}">{escape_xml(code_text)}</codeblock>')
                 else:
                     result.append(f'<codeblock>{escape_xml(code_text)}</codeblock>')
         elif child.name in ["ul", "ol"]:
@@ -402,6 +581,77 @@ def convert_list_item_content(li_element) -> list:
 
     return result
 
+# Rough advance per character, as a fraction of the font size. Code cells are
+# set in Courier New, which advances 0.6em for every glyph; prose is Helvetica,
+# where 0.5em is a fair average across mixed-case text.
+_MONO_ADVANCE = 0.6
+_PROSE_ADVANCE = 0.5
+
+# Cell padding, in em of the table font. A flat per-column cost, so it belongs
+# in the weight: leave it out and every column is allocated its text width and
+# then has padding taken back out of it.
+_CELL_PADDING = 1.5
+
+
+def _cell_widths(cell):
+    """(longest unbreakable run, whole-cell width) for one cell, in em.
+
+    The two numbers answer different questions. A cell wraps at spaces, so its
+    natural width is only what it would like; the longest run without a space
+    is what it *needs*, because nothing can break an identifier like
+    OPENCODE_PROVIDER_ANTHROPIC_API_KEY and a column narrower than that one run
+    is a column the text runs out of.
+    """
+    longest = natural = 0.0
+
+    for text in cell.strings:
+        mono = any(parent.name == "code" for parent in text.parents)
+        advance = _MONO_ADVANCE if mono else _PROSE_ADVANCE
+        natural += len(text) * advance
+        for run in str(text).split():
+            longest = max(longest, len(run) * advance)
+
+    return longest, natural
+
+
+def estimate_colwidths(rows, num_cols):
+    """Proportional column weights for a table's colspecs, or None.
+
+    Without these every column takes an equal share whatever it holds, which is
+    how a column of environment-variable names came to need 210pt of a 154pt
+    third of the table and ran off the page.
+
+    A column is weighted by the longest run it has to fit, plus cell padding,
+    with a floor of a quarter of its natural width so a column of prose is not
+    squeezed to nothing next to one holding a long identifier. The floor is
+    deliberately low: prose wraps and an identifier does not, so where the two
+    compete the identifier has to win. Cells that span columns are skipped,
+    since their width belongs to no single column.
+    """
+    longest = [0.0] * num_cols
+    natural = [0.0] * num_cols
+
+    for row in rows:
+        cells = row.find_all(["td", "th"], recursive=False)
+        for index, cell in enumerate(cells):
+            if index >= num_cols or cell.get("colspan"):
+                continue
+            run, whole = _cell_widths(cell)
+            longest[index] = max(longest[index], run)
+            natural[index] = max(natural[index], whole)
+
+    weights = [max(longest[i], natural[i] / 4) + _CELL_PADDING
+               for i in range(num_cols)]
+    total = sum(weights)
+    if not total:
+        return None
+
+    # Scaled to a thousand rather than to the smallest column: rounding to
+    # small integers costs enough precision to push a column a point short of
+    # the string it exists to hold.
+    return [max(1, round(1000 * w / total)) for w in weights]
+
+
 def convert_table_to_dita(table_element) -> str:
     """Convert HTML table to DITA table with formatting preserved."""
     dita_table = ['    <table>']
@@ -423,9 +673,20 @@ def convert_table_to_dita(table_element) -> str:
 
     dita_table.append(f'      <tgroup cols="{num_cols}">')
 
-    # Add column specifications
+    # Add column specifications, sized to what each column has to hold.
+    all_rows = []
+    for section in (thead, tbody):
+        if section:
+            all_rows.extend(section.find_all("tr"))
+    widths = estimate_colwidths(all_rows, num_cols)
+
     for i in range(num_cols):
-        dita_table.append('        <colspec colname="c{}" colnum="{}"/>'.format(i+1, i+1))
+        if widths:
+            dita_table.append(
+                '        <colspec colname="c{}" colnum="{}" colwidth="{}*"/>'.format(
+                    i + 1, i + 1, widths[i]))
+        else:
+            dita_table.append('        <colspec colname="c{}" colnum="{}"/>'.format(i+1, i+1))
 
     if thead:
         dita_table.append('        <thead>')
@@ -951,28 +1212,19 @@ def md_to_dita_topic(md_path: str, topic_id: str, title: str, file_to_topic: dic
                     language = classes.replace("language-", "")
 
                 code_text = code_elem.get_text()
+                outputclass = resolve_code_outputclass(language, code_text)
 
-                # Auto-detect language if not specified
-                if not language:
-                    detected = detect_language(code_text)
-                    if detected:
-                        language = detected
-                        log(f"🔍 Auto-detected language: {language}")
-
-                # Add outputclass for syntax highlighting
-                if language:
-                    dita_parts.append(f'    <codeblock outputclass="language-{language}">{escape_xml(code_text)}</codeblock>')
+                # Add outputclass for syntax highlighting, or to mark a diagram
+                if outputclass:
+                    dita_parts.append(f'    <codeblock outputclass="{outputclass}">{escape_xml(code_text)}</codeblock>')
                 else:
                     dita_parts.append(f'    <codeblock>{escape_xml(code_text)}</codeblock>')
             else:
                 # Fallback to pre content
                 code_text = element.get_text()
-
-                # Try auto-detection for pre blocks without code element
-                detected = detect_language(code_text)
-                if detected:
-                    log(f"🔍 Auto-detected language: {detected}")
-                    dita_parts.append(f'    <codeblock outputclass="language-{detected}">{escape_xml(code_text)}</codeblock>')
+                outputclass = resolve_code_outputclass(None, code_text)
+                if outputclass:
+                    dita_parts.append(f'    <codeblock outputclass="{outputclass}">{escape_xml(code_text)}</codeblock>')
                 else:
                     dita_parts.append(f'    <codeblock>{escape_xml(code_text)}</codeblock>')
         elif element.name == "table":
@@ -991,7 +1243,30 @@ def md_to_dita_topic(md_path: str, topic_id: str, title: str, file_to_topic: dic
     dita_parts.append('  </body>')
     dita_parts.append('</topic>')
 
-    return "\n".join(dita_parts)
+    return _deduplicate_anchor_ids("\n".join(dita_parts))
+
+
+def _deduplicate_anchor_ids(topic_xml: str) -> str:
+    """Make every @id unique within one topic.
+
+    Two headings that slugify the same — "Availability" appearing in more than
+    one section, say — produce the same anchor id, which DITA-OT reports as
+    DOTJ057E and which leaves the second anchor unreachable. Later occurrences
+    are suffixed. Cross-references keep resolving because they target the slug,
+    which still belongs to the first occurrence.
+    """
+    seen = {}
+
+    def rename(match):
+        anchor = match.group(1)
+        count = seen.get(anchor, 0)
+        seen[anchor] = count + 1
+        if not count:
+            return match.group(0)
+        log(f"   ⚠️  Duplicate anchor '{anchor}' renamed to '{anchor}-{count + 1}'")
+        return f'<ph id="{anchor}-{count + 1}"/>'
+
+    return re.sub(r'<ph id="([^"]+)"/>', rename, topic_xml)
 
 def convert_headings_to_lists(md_text: str) -> str:
     """Convert heading-based TOC to nested list format.
@@ -1399,15 +1674,19 @@ def build_dita_map(toc_soup: BeautifulSoup, dita_dir: Path, base_path: str = "",
         f'    <mainbooktitle>{escape_xml(doc_title)}</mainbooktitle>'
     ]
 
-    # Add subtitle if present
+    # Add subtitle if present.
+    # <booktitle> content model is (booklibrary?, mainbooktitle, booktitlealt*) —
+    # the alternate title is a sibling <booktitlealt>, not a nested <booktitle>.
     if metadata and metadata.get('subtitle'):
-        bookmap_parts.append(f'    <booktitlealts>')
-        bookmap_parts.append(f'      <booktitle>{escape_xml(metadata["subtitle"])}</booktitle>')
-        bookmap_parts.append(f'    </booktitlealts>')
+        bookmap_parts.append(f'    <booktitlealt>{escape_xml(metadata["subtitle"])}</booktitlealt>')
 
     bookmap_parts.append(f'  </booktitle>')
 
-    # Add metadata section
+    # Add metadata section.
+    # <bookmeta> is an ordered content model: (author|authorinformation)*,
+    # then publisherinformation*, then bookrights*. Emitting these out of order,
+    # or putting <personname>/<organizationname> directly inside <author>/<publisher>,
+    # is rejected by the bookmap DTD.
     if metadata:
         bookmap_parts.append('  <bookmeta>')
 
@@ -1417,15 +1696,13 @@ def build_dita_map(toc_soup: BeautifulSoup, dita_dir: Path, base_path: str = "",
             if isinstance(authors, str):
                 authors = [authors]
             for author in authors:
-                bookmap_parts.append('    <author>')
-                bookmap_parts.append(f'      <personname>{escape_xml(author)}</personname>')
-                bookmap_parts.append('    </author>')
+                bookmap_parts.append(f'    <author>{escape_xml(author)}</author>')
 
         # Add publisher
         if metadata.get('publisher'):
-            bookmap_parts.append('    <publisher>')
-            bookmap_parts.append(f'      <organizationname>{escape_xml(metadata["publisher"])}</organizationname>')
-            bookmap_parts.append('    </publisher>')
+            bookmap_parts.append('    <publisherinformation>')
+            bookmap_parts.append(f'      <organization>{escape_xml(metadata["publisher"])}</organization>')
+            bookmap_parts.append('    </publisherinformation>')
 
         # Add copyright/rights
         if metadata.get('rights'):
@@ -1572,6 +1849,8 @@ def main():
     with open(bookmap_path, "w", encoding="utf-8") as f:
         f.write(bookmap_content)
     log(f"✅ Generated DITA bookmap: {bookmap_path}")
+
+    report_long_code_lines(md_dir_path)
 
     log(f"🎉 Done! Generated DITA files in {DITA_DIR}/")
 

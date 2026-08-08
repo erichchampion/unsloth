@@ -32,20 +32,34 @@ The function accepts a large parameter surface to cover the full range of use ca
 
 ```python
 FastLanguageModel.from_pretrained(
-    model_name     = "unsloth/Llama-3.2-1B-Instruct",  # HF ID or local path
-    max_seq_length = 2048,         # Context window size
-    load_in_4bit   = True,         # QLoRA 4-bit quantization (default)
-    load_in_8bit   = False,        # 8-bit quantization
-    load_in_16bit  = False,        # No quantization, 16-bit weights
-    load_in_fp8    = False,        # FP8 quantization
-    full_finetuning = False,       # Disable all quantization
-    fast_inference  = False,       # Enable vLLM backend
-    dtype           = None,        # Override dtype (bf16/fp16/fp32)
-    token           = None,        # Hugging Face auth token
-    trust_remote_code = False,     # Allow custom model code
-    use_gradient_checkpointing = "unsloth",  # Gradient checkpointing strategy
-    gpu_memory_utilization = 0.5,  # vLLM GPU memory fraction
-    float8_kv_cache = False,       # FP8 KV cache for vLLM
+    # HF ID or local path
+    model_name     = "unsloth/Llama-3.2-1B-Instruct",
+    # Context window size
+    max_seq_length = 2048,
+    # QLoRA 4-bit quantization (default)
+    load_in_4bit   = True,
+    # 8-bit quantization
+    load_in_8bit   = False,
+    # No quantization, 16-bit weights
+    load_in_16bit  = False,
+    # FP8 quantization
+    load_in_fp8    = False,
+    # Disable all quantization
+    full_finetuning = False,
+    # Enable vLLM backend
+    fast_inference  = False,
+    # Override dtype (bf16/fp16/fp32)
+    dtype           = None,
+    # Hugging Face auth token
+    token           = None,
+    # Allow custom model code
+    trust_remote_code = False,
+    # Gradient checkpointing strategy
+    use_gradient_checkpointing = "unsloth",
+    # vLLM GPU memory fraction
+    gpu_memory_utilization = 0.5,
+    # FP8 KV cache for vLLM
+    float8_kv_cache = False,
 )
 # Returns: (model, tokenizer)
 ```
@@ -53,7 +67,8 @@ FastLanguageModel.from_pretrained(
 The most common call is just:
 
 ```python
-model, tokenizer = FastLanguageModel.from_pretrained("unsloth/Llama-3.2-1B-Instruct")
+model, tokenizer = FastLanguageModel.from_pretrained(
+    "unsloth/Llama-3.2-1B-Instruct")
 ```
 
 This loads the model in 4-bit QLoRA mode with a 2048-token context.
@@ -95,8 +110,10 @@ Once the name is resolved, Unsloth must determine the model's architecture to se
 
 ```python
 # loader.py — architecture detection
-model_config = AutoConfig.from_pretrained(model_name, token=token)
-model_type = model_config.model_type  # e.g., "llama", "gemma2", "qwen3"
+model_config = AutoConfig.from_pretrained(
+    model_name, token=token)
+# e.g., "llama", "gemma2", "qwen3"
+model_type = model_config.model_type
 ```
 
 For LoRA adapters, the process is more complex. The function tries `PeftConfig.from_pretrained()` to read the adapter's `base_model_name_or_path`, then loads the base model's config to determine the architecture. This handles the case where the user passes a LoRA checkpoint path instead of a base model.
@@ -166,7 +183,8 @@ The selected `Fast*Model.from_pretrained()` then:
 If a LoRA adapter is detected (via `adapter_config.json` in the model path), Unsloth applies it:
 
 ```python
-model = PeftModel.from_pretrained(model, model_name, token=token)
+model = PeftModel.from_pretrained(
+    model, model_name, token=token)
 ```
 
 ### RoPE Fix for Transformers v5

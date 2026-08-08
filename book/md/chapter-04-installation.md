@@ -45,7 +45,9 @@ The key distinction is between **Studio** (web UI with frontend build) and **Cor
 The fastest path to a working installation is the one-line script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/unslothai/unsloth/main/install.sh | sh
+curl -fsSL \
+  https://raw.githubusercontent.com/unslothai/unsloth/main/install.sh \
+  | sh
 ```
 
 This 265-line shell script performs the following steps:
@@ -94,7 +96,8 @@ The script creates a dedicated `unsloth_studio` virtual environment with Python 
 ### Step 5: Install Unsloth
 
 ```bash
-uv pip install --python "$VENV_NAME/bin/python" "unsloth>=2026.3.11" --torch-backend=auto
+uv pip install --python "$VENV_NAME/bin/python" \
+  "unsloth>=2026.3.11" --torch-backend=auto
 ```
 
 The `--torch-backend=auto` flag tells `uv` to automatically detect and install the correct PyTorch build for the system's CUDA version. This is the critical step that resolves the CUDA × PyTorch × xformers compatibility matrix described in Chapter 3.

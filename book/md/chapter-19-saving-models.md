@@ -39,10 +39,12 @@ After training completes, the model must be persisted to disk for later use — 
 model.save_pretrained("my_lora_adapter")
 
 # Save merged 16-bit model (for GGUF or deployment)
-model.save_pretrained_merged("my_model_16bit", save_method="merged_16bit")
+model.save_pretrained_merged(
+    "my_model_16bit", save_method="merged_16bit")
 
 # Save merged 4-bit model (caution: irreversible quantization)
-model.save_pretrained_merged("my_model_4bit", save_method="merged_4bit_forced")
+model.save_pretrained_merged(
+    "my_model_4bit", save_method="merged_4bit_forced")
 ```
 
 Note the `"merged_4bit"` method deliberately raises an error unless you use `"merged_4bit_forced"`. This is a safety measure — merging to 4-bit loses accuracy permanently and should only be a final step.
@@ -66,7 +68,9 @@ def _merge_lora(layer, name):
 
     # Step 3: Merge LoRA: W += s * (A^T @ B^T)
     if A is not None:
-        W.addmm_(A.t().to(torch.float32), B.t().to(torch.float32), alpha=s)
+        W.addmm_(
+            A.t().to(torch.float32), B.t().to(torch.float32),
+            alpha=s)
 
     # Step 4: Check for numerical issues
     maximum_element = torch.max(W.min().abs(), W.max())
@@ -105,8 +109,10 @@ The function calculates available memory accounting for sharding overhead:
 
 ```python
 max_ram = psutil.virtual_memory().available
-max_ram -= sharded_ram_usage  # Reserve space for safetensors shard
-max_ram = int(max(0, max_ram) * maximum_memory_usage)  # 90% safety margin
+# Reserve space for safetensors shard
+max_ram -= sharded_ram_usage
+# 90% safety margin
+max_ram = int(max(0, max_ram) * maximum_memory_usage)
 ```
 
 ---
@@ -136,11 +142,14 @@ The merged_16bit path iterates through every layer in the model:
 
 ```python
 for j, layer in enumerate(ProgressBar(internal_model.model.layers)):
-    for item in LLAMA_WEIGHTS:  # q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+    # q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+    for item in LLAMA_WEIGHTS:
         W, bias = _merge_lora(eval(f"layer.{item}"), name)
-        state_dict[name] = W  # or spill to RAM/disk
+        # or spill to RAM/disk
+        state_dict[name] = W
 
-    for item in LLAMA_LAYERNORMS:  # input_layernorm, post_attention_layernorm, etc.
+    # input_layernorm, post_attention_layernorm, etc.
+    for item in LLAMA_LAYERNORMS:
         state_dict[name] = eval(f"layer.{item}.weight.data")
 ```
 
@@ -155,9 +164,11 @@ The tokenizer is saved alongside the model with one important adjustment:
 ```python
 # Set padding side for inference
 old_padding_side = tokenizer.padding_side
-tokenizer.padding_side = "left"     # Left padding for batched generation
+# Left padding for batched generation
+tokenizer.padding_side = "left"
 tokenizer.save_pretrained(...)
-tokenizer.padding_side = old_padding_side  # Revert for continued training
+# Revert for continued training
+tokenizer.padding_side = old_padding_side
 ```
 
 This ensures that saved tokenizers default to left-padding, which is required for correct batched inference.

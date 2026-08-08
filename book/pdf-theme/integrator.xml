@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<project name="pdf-theme">
+  <target name="dita2pdf-theme.init">
+    <property location="${dita.plugin.pdf-theme.dir}/cfg" name="customization.dir" />
+    <property name="pdf2.i18n.skip" value="true" />
+    <property location="${dita.plugin.pdf-theme.dir}/xsl/fo/topic2fo_shell_fop.xsl" name="args.xsl.pdf" />
+    <property name="args.chapter.layout" value="BASIC" />
+    <property name="args.bookmark.style" value="COLLAPSED" />
+    <property name="args.fo.include.rellinks" value="none" />
+  </target>
+  <target depends="dita2pdf-theme.init, dita2pdf2" name="dita2pdf-theme" />
+</project>

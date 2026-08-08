@@ -34,7 +34,8 @@ Full fine-tuning is enabled by passing `full_finetuning=True` (or `load_in_16bit
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Llama-3.2-3B",
     max_seq_length = 4096,
-    full_finetuning = True,  # No quantization, all params trainable
+    # No quantization, all params trainable
+    full_finetuning = True,
 )
 # No get_peft_model() call needed — all parameters are already trainable
 ```
