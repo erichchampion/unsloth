@@ -15,8 +15,11 @@
  *   2. `white-space` is supported only as `nowrap` or `normal` — neither `pre`
  *      nor `pre-wrap`. Preformatted whitespace therefore cannot be relied on,
  *      which is why epub_writer.py emits one <div class="cl"> per logical line
- *      and hard-spaces the leading indentation. Nothing here declares
- *      `white-space`.
+ *      and hard-spaces both the alignment runs inside a line and the indent
+ *      that opens it. Nothing here declares `white-space`. The two runs use
+ *      different characters — U+00A0 inside, U+2007 to open — because Kindle
+ *      draws a leading no-break space at roughly 0.4 of a character while
+ *      leaving an interior one alone.
  *
  *   3. `overflow` is supported only as `hidden`, and `word-wrap` is ignored
  *      outright. There is no scrollable region and no soft-wrap override:
@@ -182,7 +185,20 @@ div.codeblock code {
  * That is also why the container is a <div> and not a <pre> — <pre> takes
  * phrasing content only, so it cannot hold block children. The monospace
  * fallback that <pre> used to provide now comes from the <code> inside each
- * line, which KDP §11.3.8 lists alongside <pre> as monospace-rendered. */
+ * line, which KDP §11.3.8 lists alongside <pre> as monospace-rendered.
+ *
+ * Nothing here indents a line by its leading whitespace, and nothing should
+ * try. Kindle Previewer resolves a length on one of these boxes against a font
+ * size about 1.45 times smaller than the size it draws the text at, so no em
+ * value is a character wide, and `ch` is dropped outright. The indent is
+ * hard-spaced in the markup instead, with the figure space U+2007 — a digit
+ * width, and so a cell in a monospace face. See
+ * epub_writer.transform_codeblocks() for the measurements.
+ *
+ * A blank source line carries a figure space of its own, for the same reason:
+ * Kindle discards an empty box along with any height declared on it, and a
+ * height in em would be measured against the wrong font size. One character
+ * makes one line box of the `line-height` above. */
 div.codeblock .cl {
   display: block;
   padding-left: 2em;
@@ -208,6 +224,8 @@ div.codeblock.diagram {
   line-height: 1.2;
 }
 
+/* Both zeroed so a diagram line starts at column 0, since its indent is the
+ * figure spaces that open it and any offset here would add to them. */
 div.codeblock.diagram .cl {
   padding-left: 0;
   text-indent: 0;        /* a wrapped diagram is already lost; don't mark it */

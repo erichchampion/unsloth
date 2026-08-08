@@ -46,8 +46,18 @@ FONT_DIR = "fonts"
 IMAGE_DIR = "images"
 
 # Every code sample is rendered in this font, so the subset must cover at least
-# printable ASCII even when the current text happens not to use all of it.
-ALWAYS_KEEP = set(range(0x20, 0x7F)) | {0x00A0}
+# printable ASCII even when the current text happens not to use all of it, plus
+# the two spaces the code lines are built from.
+ALWAYS_KEEP = set(range(0x20, 0x7F)) | {0x00A0, 0x2007}
+
+# Spelled out rather than written as literals: an invisible character in source
+# is too easy to lose in an edit.
+#
+# Two spaces for two jobs, see transform_codeblocks(). NBSP holds the alignment
+# runs inside a line. FIGSP, the figure space, opens an indented line, because
+# a leading run is the one place a no-break space is not a character wide.
+NBSP = "\u00a0"
+FIGSP = "\u2007"
 
 MEDIA_TYPES = {
     ".html": "application/xhtml+xml",
@@ -88,10 +98,37 @@ def transform_codeblocks(soup):
     program.
 
     Each logical line becomes `<span class="cl">`, styled `display: block` (one
-    of the values Appendix B does list). Leading spaces become U+00A0. Both
-    changes are inert on a conforming reader — inside a real <pre> a
-    no-break space renders as a space and a block box breaks the line anyway —
+    of the values Appendix B does list). Alignment runs inside a line become
+    U+00A0. Both changes are inert on a conforming reader — inside a real <pre>
+    a no-break space renders as a space and a block box breaks the line anyway —
     so nothing is lost off-Kindle.
+
+    The *leading* run is the exception, and it is hard-spaced with a figure
+    space rather than a no-break one. Kindle Previewer draws a leading U+00A0 at
+    roughly 0.4 of a character — nine of them come out about three and a half
+    columns wide, which is the four-ish columns of indent that went missing in
+    the first place. An interior run of the same character is untouched, so only
+    the opening of a line needs the other space.
+
+    U+2007 is defined as the width of a digit, and in a monospace face that is
+    one cell. Measuring a ruled test page in Previewer puts a nine-deep figure
+    space indent at 9.03 columns, against 3.59 for no-break spaces.
+
+    A CSS length was tried first, three ways, and none of them can work here.
+    Previewer resolves a length on the line box against a font size about 1.45
+    times smaller than the size it draws the text at, so `margin-left: 5.4em`
+    lands at 6.22 columns while `width: 5.4em` on a span *inside* the line
+    lands at 9.03 — the same length, the same page. The unit that would sidestep
+    that is `ch`, which Previewer drops outright, along with `@supports`; and
+    pairing units as fallback declarations makes it discard the property
+    altogether. Characters are the only thing that tracks the face actually
+    rendering.
+
+    A blank line between stanzas carries a figure space too, for the same
+    reason. An empty box is dropped outright, and giving one a height in em
+    would put the gap through the same 1.45 mismatch the indent went through.
+    One character makes one line box, measured in whatever font size the
+    reader settled on.
 
     Per-line blocks are also what makes the hanging indent in ebook.css work:
     `text-indent` applies to the first formatted line of a block, so a hanging
@@ -141,16 +178,29 @@ def transform_codeblocks(soup):
             lines.pop()
 
         for parts in lines:
+            indent = _take_leading_indent(parts)
+
             line = soup.new_tag("div")
             line["class"] = ["cl"]
+
+            # A line with nothing left after its indent is a blank one, whether
+            # it was empty in the source or held only spaces. It carries a
+            # single figure space: an empty box gets dropped, and a height in
+            # em would be measured against the wrong font size, the same way an
+            # indent in em was. One character is one line box.
+            if not parts:
+                parts = [FIGSP]
+                indent = 0
+
+            _harden_whitespace(parts)
+
+            # The indent goes back as figure spaces. Being characters, they
+            # advance with the face doing the rendering, which no CSS length
+            # here managed to do.
+            if indent:
+                parts.insert(0, FIGSP * indent)
+
             holder = soup.new_tag("code")
-
-            if parts:
-                _harden_whitespace(parts)
-            else:
-                # Preserve deliberate blank lines between logical stanzas.
-                parts = [" "]
-
             for part in parts:
                 holder.append(part)
             line.append(holder)
@@ -197,6 +247,67 @@ def _split_lines(node, soup):
     return lines
 
 
+def _take_leading_indent(parts):
+    """Strip the leading run of spaces from one assembled line, in place.
+
+    Returns how many spaces were taken, for the caller to put back as figure
+    spaces. They come out first because the source spaces are ordinary U+0020,
+    which collapses at the start of a block — see `transform_codeblocks()` for
+    why the replacement is a figure space and not a no-break one.
+
+    The run does not always begin in a bare string. A line lifted out of a
+    multi-line Prism token opens with a cloned span instead, so the walk
+    descends into the first tag and keeps going while it finds only spaces; 35
+    lines across the two books need this, 14 here and 21 in the other. A part
+    emptied of all its text is dropped, since an empty span would only widen
+    the markup.
+    """
+    taken = 0
+
+    while parts:
+        part = parts[0]
+
+        if isinstance(part, str):
+            rest = part.lstrip(" ")
+            taken += len(part) - len(rest)
+            if rest:
+                parts[0] = rest
+                break
+            parts.pop(0)
+            continue
+
+        consumed, emptied = _take_tag_indent(part)
+        taken += consumed
+        if not emptied:
+            break
+        parts.pop(0)
+
+    return taken
+
+
+def _take_tag_indent(tag):
+    """Strip the leading spaces from inside one tag, in place.
+
+    Returns (spaces taken, whether the tag was left with no text at all). The
+    caller needs the second value to know whether to carry on into the next
+    part of the line.
+    """
+    taken = 0
+
+    for descendant in list(tag.descendants):
+        if not isinstance(descendant, str):
+            continue
+        text = str(descendant)
+        rest = text.lstrip(" ")
+        taken += len(text) - len(rest)
+        if rest:
+            descendant.replace_with(rest)
+            return taken, False
+        descendant.extract()
+
+    return taken, True
+
+
 def _harden_whitespace(parts):
     """Harden every alignment run in one assembled line, in place.
 
@@ -215,6 +326,11 @@ def _harden_whitespace(parts):
     triple-quoted string or a block comment begins with a cloned token span
     rather than a bare string, and a diagram's columns sit between spans as
     often as inside them.
+
+    This runs after `_take_leading_indent()`, so by here the line no longer
+    starts with whitespace and every run left is an interior one. That split
+    matters: an interior run survives Kindle's conversion as no-break spaces,
+    whereas a leading one does not survive at all.
     """
     for index, part in enumerate(parts):
         if isinstance(part, str):
@@ -232,7 +348,7 @@ _RUN = re.compile(r"  +")
 
 def _harden_runs(text):
     """Replace every run of two or more spaces with no-break spaces."""
-    return _RUN.sub(lambda m: " " * len(m.group(0)), text)
+    return _RUN.sub(lambda m: NBSP * len(m.group(0)), text)
 
 
 # --------------------------------------------------------------------------
