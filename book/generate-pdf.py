@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -136,10 +137,89 @@ def run_dita_ot(ditamap_path: Path, output_dir: Path, output_pdf: str, dita_dir:
         log(e.stderr)
         sys.exit(1)
 
+def page_size(gs_command: str, pdf: Path):
+    """The first page's MediaBox as (width, height) in points, or None.
+
+    Ghostscript is already a hard requirement here, so the size is read with
+    it rather than by adding a second PDF library to the toolchain.
+    """
+    # The path is interpolated into a PostScript string literal.
+    escaped = re.sub(r"([()\\])", r"\\\1", str(pdf))
+    query = (
+        f"({escaped}) (r) file runpdfbegin 1 pdfgetpage "
+        "/MediaBox pget {==} {(none) =} ifelse quit"
+    )
+
+    try:
+        result = subprocess.run(
+            [gs_command, "-q", "-dNODISPLAY", "-dNOSAFER", "-c", query],
+            capture_output=True, text=True, check=True, timeout=60,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+
+    found = re.search(r"\[\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s*\]",
+                      result.stdout)
+    if not found:
+        return None
+
+    x0, y0, x1, y1 = (float(n) for n in found.groups())
+    return abs(x1 - x0), abs(y1 - y0)
+
+
+def normalise_cover(gs_command: str, cover_pdf: Path, target, work_dir: Path):
+    """Rescale the cover to the body's page size, or return it unchanged.
+
+    The cover art is exported at 300 dpi, and its page box carries those
+    pixels as if they were points: 2550x3300 against the body's 612x792, the
+    same 8.5x11 inches at 4.167 times the size. Acrobat and Preview both
+    believe it, so the book opens on a cover page nearly three feet wide.
+
+    The aspect ratios match, so fitting the page is a pure scale — no crop, no
+    letterboxing. Comparing renders of the two at the same pixel size, 42 of
+    935,000 pixels differ, all of them antialiasing along glyph edges.
+    """
+    size = page_size(gs_command, cover_pdf)
+    if size is None:
+        log("   ⚠️  Could not read the cover's page size; using it unchanged")
+        return cover_pdf
+
+    # A point either way is well inside what rounding explains.
+    if max(abs(size[0] - target[0]), abs(size[1] - target[1])) < 1.0:
+        return cover_pdf
+
+    log(f"   Cover is {size[0]:g}x{size[1]:g}pt against the body's "
+        f"{target[0]:g}x{target[1]:g}pt; rescaling")
+
+    scaled = work_dir / "cover_letter.pdf"
+    cmd = [
+        gs_command, "-dBATCH", "-dNOPAUSE", "-q",
+        "-sDEVICE=pdfwrite",
+        "-dPDFSETTINGS=/prepress",
+        f"-dDEVICEWIDTHPOINTS={target[0]:g}",
+        f"-dDEVICEHEIGHTPOINTS={target[1]:g}",
+        "-dFIXEDMEDIA",   # the page box becomes the size asked for
+        "-dPDFFitPage",   # and the art is scaled into it
+        f"-sOutputFile={scaled}",
+        str(cover_pdf),
+    ]
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        log("   ⚠️  Could not rescale the cover; using it unchanged")
+        log(exc.stderr)
+        return cover_pdf
+
+    return scaled
+
+
 def combine_with_cover_page(output_pdf: str):
     """
     Post-processing step to combine 8.5x11.pdf with the generated user guide PDF.
     Uses ghostscript to redistill and combine PDFs with 8.5x11.pdf as the first page.
+
+    The cover is rescaled to the body's page size first — see normalise_cover().
     """
     output_path = Path(output_pdf)
     output_dir = output_path.parent if output_path.parent != Path('.') else Path.cwd()
@@ -167,6 +247,17 @@ def combine_with_cover_page(output_pdf: str):
         log("   Install ghostscript: brew install ghostscript")
         return
 
+    # Match the cover to the body rather than the other way round: the body is
+    # whatever trim size the PDF theme was built for, and is already right.
+    target = page_size(gs_command, output_path)
+    if target is None:
+        log("   ⚠️  Could not read the body's page size; leaving the cover alone")
+        combined_cover = cover_pdf
+    else:
+        combined_cover = normalise_cover(
+            gs_command, cover_pdf, target, output_path.parent
+        )
+
     # Create temporary output file
     temp_output = output_path.parent / f"{output_path.stem}_combined.pdf"
 
@@ -179,7 +270,7 @@ def combine_with_cover_page(output_pdf: str):
         "-sDEVICE=pdfwrite",
         "-dPDFSETTINGS=/prepress",  # High quality output
         f"-sOutputFile={temp_output}",
-        str(cover_pdf),
+        str(combined_cover),
         str(output_path)
     ]
 
@@ -199,6 +290,11 @@ def combine_with_cover_page(output_pdf: str):
         if temp_output.exists():
             temp_output.unlink()
         log(f"⚠️  Continuing with original PDF (not combined)")
+
+    finally:
+        # The rescaled cover is scratch; the original 8.5x11.pdf is not.
+        if combined_cover != cover_pdf and combined_cover.exists():
+            combined_cover.unlink()
 
 # ---------------------------------------------------------------------
 def main():
